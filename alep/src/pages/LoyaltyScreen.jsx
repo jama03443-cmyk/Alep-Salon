@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle2, Copy, Gift, History, LogIn, LogOut, Minus, Plus, Scissors, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
+import { CheckCircle2, Copy, Gift, History, LogIn, LogOut, Minus, Plus, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
@@ -202,7 +202,7 @@ export default function LoyaltyScreen() {
     {toast && <SuccessToast title={toast.title} text={toast.text} />}
     <div className="mx-auto max-w-5xl">
       <header className="flex items-center justify-between border-b border-zinc-800 pb-6">
-        <Link to="/" className="flex items-center gap-3 transition-colors hover:text-amber-200"><span className="flex h-9 w-9 items-center justify-center border border-zinc-600"><Scissors size={17} /></span><span className="font-display text-sm font-black uppercase tracking-[0.2em]">Alep Salon</span></Link>
+        <Link to="/" aria-label="Alep Salon — accueil" className="inline-flex items-center transition-opacity hover:opacity-80"><img src="/alep-salon-logo.png" alt="Alep Salon" className="h-12 w-auto max-w-[190px] object-contain" /></Link>
         {session && <button type="button" onClick={signOut} className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition hover:text-amber-200"><LogOut size={14} /> Déconnexion</button>}
       </header>
       {session ? <>{profile && (!profile.first_name || !profile.last_name || !profile.whatsapp) ? <ProfileCompletion firstName={firstName} lastName={lastName} whatsappInput={whatsappInput} setFirstName={setFirstName} setLastName={setLastName} setWhatsappInput={setWhatsappInput} onSubmit={handleProfileCompletion} isSubmitting={isSubmitting} errorMessage={errorMessage} /> : <LoyaltyCard card={card} events={pointEvents} copied={copied} onCopy={copyCode} />}</> : <section className="mx-auto mt-14 grid max-w-4xl gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">

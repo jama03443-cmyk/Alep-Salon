@@ -780,7 +780,7 @@ export default function AdminDashboard() {
       <header className="border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
           <div className="flex items-center gap-3">
-            <LogoStylePreview style={siteLogoStyle} />
+            <img src="/alep-salon-logo.png" alt="Alep Salon" className="h-12 w-auto max-w-[190px] object-contain" />
             <p className="border-l border-zinc-700 pl-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">{labels.admin}</p>
           </div>
           <div className="flex items-center justify-between gap-4 sm:justify-end">
