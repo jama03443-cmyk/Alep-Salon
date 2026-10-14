@@ -3,12 +3,16 @@ export const BODY_COLOR_OPTIONS = [
   { value: '#f3eee5', label: 'Sable', color: '#f3eee5' },
   { value: '#eaf0e8', label: 'Sauge', color: '#eaf0e8' },
   { value: '#f1e9ed', label: 'Rose clair', color: '#f1e9ed' },
+  { value: '#e6f7f7', label: 'Turquoise clair', color: '#e6f7f7' },
+  { value: '#fbe9e7', label: 'Rouge suisse clair', color: '#fbe9e7' },
 ]
 
 export const FOOTER_COLOR_OPTIONS = [
   { value: '#171614', label: 'Noir', color: '#171614' },
   { value: '#252c34', label: 'Ardoise', color: '#252c34' },
   { value: '#24543c', label: 'Vert', color: '#24543c' },
+  { value: '#0f8b8d', label: 'Bleu turquoise', color: '#0f8b8d' },
+  { value: '#da291c', label: 'Rouge suisse', color: '#da291c' },
   { value: '#fffdf7', label: 'Ivoire', color: '#fffdf7' },
   { value: '#f3eee5', label: 'Sable', color: '#f3eee5' },
 ]
@@ -18,6 +22,8 @@ export const BUTTON_COLOR_OPTIONS = [
   { value: '#2d6a4f', label: 'Vert', color: '#2d6a4f' },
   { value: '#8e2c3c', label: 'Bordeaux', color: '#8e2c3c' },
   { value: '#345995', label: 'Bleu', color: '#345995' },
+  { value: '#0f8b8d', label: 'Bleu turquoise', color: '#0f8b8d' },
+  { value: '#da291c', label: 'Rouge suisse', color: '#da291c' },
 ]
 
 export const LOGO_STYLE_OPTIONS = [
