@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Camera,
   CalendarDays,
   Check,
   ImageUp,
+  History,
   LogOut,
   Plus,
   QrCode,
@@ -90,6 +91,11 @@ export default function AdminDashboard() {
   const [selectedSlotTimes, setSelectedSlotTimes] = useState([])
   const [loyaltySearch, setLoyaltySearch] = useState('')
   const [selectedLoyaltyCard, setSelectedLoyaltyCard] = useState(null)
+  const [historyCardId, setHistoryCardId] = useState(null)
+  const [loyaltyHistory, setLoyaltyHistory] = useState([])
+  const [isLoadingLoyaltyHistory, setIsLoadingLoyaltyHistory] = useState(false)
+  const [deletingLoyaltyCardId, setDeletingLoyaltyCardId] = useState(null)
+  const [deletingReservationId, setDeletingReservationId] = useState(null)
   const [isScanning, setIsScanning] = useState(false)
   const [scannerMessage, setScannerMessage] = useState('')
   const videoRef = useRef(null)
@@ -123,7 +129,7 @@ export default function AdminDashboard() {
     const [reservationsResult, servicesResult, loyaltyResult, availabilityResult, barbersResult, heroSettingsResult] = await Promise.all([
       supabase
         .from('reservations')
-        .select('id, client_name, client_phone, service_name, appointment_date, appointment_time, status, confirmed_at, created_at, availability_slots(barber_id, barbers(id, name, image_url))')
+        .select('id, client_name, client_phone, service_name, appointment_date, appointment_time, status, confirmed_at, created_at, availability_slot_id, availability_slots(barber_id, barbers(id, name, image_url))')
         .order('appointment_date', { ascending: true })
         .order('appointment_time', { ascending: true }),
       supabase.from('services').select('id, category, name, price, image_url, image_title').order('category').order('name'),
@@ -318,6 +324,79 @@ export default function AdminDashboard() {
         payload: { cardId },
       })
     }
+  }
+
+  const toggleLoyaltyHistory = async (card) => {
+    if (historyCardId === card.id) {
+      setHistoryCardId(null)
+      setLoyaltyHistory([])
+      return
+    }
+    setHistoryCardId(card.id)
+    setIsLoadingLoyaltyHistory(true)
+    setLoyaltyHistory([])
+    const { data, error } = await supabase
+      .from('loyalty_point_events')
+      .select('id, point_delta, created_at')
+      .eq('loyalty_card_id', card.id)
+      .order('created_at', { ascending: false })
+    setIsLoadingLoyaltyHistory(false)
+    if (error) {
+      setFeedback({ type: 'error', text: 'L’historique de ce client ne peut pas être chargé.' })
+      return
+    }
+    setLoyaltyHistory(data ?? [])
+  }
+
+  const deleteLoyaltyCard = async (card) => {
+    const clientName = card.profiles?.full_name || card.profiles?.email || 'ce client'
+    const confirmation = language === 'DE'
+      ? `Die Treuekarte und der Punkteverlauf von ${clientName} löschen? Das Kundenprofil bleibt erhalten.`
+      : `Supprimer la carte fidélité et l’historique de ${clientName} ? Son profil client restera intact.`
+    if (!supabase || deletingLoyaltyCardId || !window.confirm(confirmation)) return
+
+    setDeletingLoyaltyCardId(card.id)
+    const { data, error } = await supabase
+      .from('loyalty_cards')
+      .delete()
+      .eq('id', card.id)
+      .select('id')
+      .maybeSingle()
+    if (error || !data) {
+      setFeedback({ type: 'error', text: error?.message || 'La carte fidélité n’a pas pu être supprimée.' })
+    } else {
+      setLoyaltyCards((current) => current.filter((item) => item.id !== card.id))
+      setSelectedLoyaltyCard((current) => current?.id === card.id ? null : current)
+      if (historyCardId === card.id) {
+        setHistoryCardId(null)
+        setLoyaltyHistory([])
+      }
+      setFeedback({ type: 'success', text: 'La carte fidélité et son historique ont été supprimés. Le profil client est conservé.' })
+    }
+    setDeletingLoyaltyCardId(null)
+  }
+
+  const deleteReservation = async (reservation) => {
+    if (!supabase || deletingReservationId) return
+    const confirmation = language === 'DE'
+      ? `Den Termin von ${reservation.client_name} am ${formatDate(reservation.appointment_date)} löschen?`
+      : `Supprimer le rendez-vous de ${reservation.client_name} du ${formatDate(reservation.appointment_date)} ?`
+    if (!window.confirm(confirmation)) return
+
+    setDeletingReservationId(reservation.id)
+    const { data, error } = await supabase.rpc('delete_client_reservation', {
+      target_reservation_id: reservation.id,
+    })
+    if (error || !data) {
+      setFeedback({ type: 'error', text: error?.message || 'Le rendez-vous n’a pas pu être supprimé.' })
+    } else {
+      setReservations((current) => current.filter((item) => item.id !== reservation.id))
+      if (reservation.availability_slot_id) {
+        setAvailabilitySlots((current) => current.map((slot) => slot.id === reservation.availability_slot_id ? { ...slot, reserved_at: null } : slot))
+      }
+      setFeedback({ type: 'success', text: 'Le rendez-vous a été supprimé et son créneau libéré.' })
+    }
+    setDeletingReservationId(null)
   }
 
   const handleAddService = async (event) => {
@@ -748,7 +827,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {isLoading ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Chargement des réservations…</p> : reservationGroups.length === 0 ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Aucune réservation pour le moment.</p> : <div className="space-y-6">{reservationGroups.map((group) => <ReservationGroup key={group.id} group={group} pricesByService={pricesByService} />)}</div>}
+            {isLoading ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Chargement des réservations…</p> : reservationGroups.length === 0 ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Aucune réservation pour le moment.</p> : <div className="space-y-6">{reservationGroups.map((group) => <ReservationGroup key={group.id} group={group} pricesByService={pricesByService} onDeleteReservation={deleteReservation} deletingReservationId={deletingReservationId} />)}</div>}
           </section>
         ) : activeTab === 'loyalty' ? (
           <section>
@@ -769,7 +848,41 @@ export default function AdminDashboard() {
               </article>
 
               <div className="overflow-x-auto border border-zinc-800 bg-zinc-900/35">
-                <table className="min-w-[720px] w-full text-left text-sm"><thead className="border-b border-zinc-800 bg-zinc-900 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500"><tr><th className="px-5 py-4">Client</th><th className="px-5 py-4">Code membre</th><th className="px-5 py-4">Points</th><th className="px-5 py-4">Dernière activité</th><th className="px-5 py-4">Actions</th></tr></thead><tbody className="divide-y divide-zinc-800">{isLoading ? <tr><td colSpan="5" className="px-5 py-14 text-center text-zinc-500">Chargement des cartes…</td></tr> : filteredLoyaltyCards.length === 0 ? <tr><td colSpan="5" className="px-5 py-14 text-center text-zinc-500">Aucune carte trouvée.</td></tr> : filteredLoyaltyCards.map((card) => <tr key={card.id} className="hover:bg-zinc-900/80"><td className="px-5 py-4"><span className="block font-semibold text-zinc-200">{card.profiles?.full_name || 'Client fidélité'}</span><span className="mt-1 block text-xs text-zinc-500">{card.profiles?.email || 'E-mail non disponible'}</span><span className="mt-1 block text-xs text-zinc-600">WhatsApp : {card.profiles?.whatsapp || '—'}</span></td><td className="px-5 py-4 font-mono text-xs text-zinc-500">{card.member_code.slice(0, 8)}…</td><td className="px-5 py-4"><span className="font-display text-2xl text-amber-200">{card.points}</span></td><td className="px-5 py-4 text-zinc-400">{formatDate(card.updated_at)}</td><td className="px-5 py-4"><div className="flex gap-2"><button type="button" onClick={() => void adjustPoints(card.id, 1)} className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-amber-200 hover:text-amber-200">+1</button><button type="button" onClick={() => void adjustPoints(card.id, -1)} disabled={card.points === 0} className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-amber-200 hover:text-amber-200">−1</button></div></td></tr>)}</tbody></table>
+                <table className="min-w-[760px] w-full text-left text-sm">
+                  <thead className="border-b border-zinc-800 bg-zinc-900 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500">
+                    <tr><th className="px-5 py-4">Client</th><th className="px-5 py-4">Code membre</th><th className="px-5 py-4">Points</th><th className="px-5 py-4">Dernière activité</th><th className="px-5 py-4">Actions</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {isLoading ? <tr><td colSpan="5" className="px-5 py-14 text-center text-zinc-500">Chargement des cartes…</td></tr>
+                      : filteredLoyaltyCards.length === 0 ? <tr><td colSpan="5" className="px-5 py-14 text-center text-zinc-500">Aucune carte trouvée.</td></tr>
+                        : filteredLoyaltyCards.map((card) => (
+                          <Fragment key={card.id}>
+                            <tr className="hover:bg-zinc-900/80">
+                              <td className="px-5 py-4">
+                                <button type="button" onClick={() => void toggleLoyaltyHistory(card)} className="block text-left font-semibold text-zinc-200 hover:text-amber-200">{card.profiles?.full_name || 'Client fidélité'}</button>
+                                <span className="mt-1 block text-xs text-zinc-500">{card.profiles?.email || 'E-mail non disponible'}</span>
+                                <span className="mt-1 block text-xs text-zinc-600">WhatsApp : {card.profiles?.whatsapp || '-'}</span>
+                              </td>
+                              <td className="px-5 py-4 font-mono text-xs text-zinc-500">{card.member_code.slice(0, 8)}...</td>
+                              <td className="px-5 py-4"><span className="font-display text-2xl text-amber-200">{card.points}</span></td>
+                              <td className="px-5 py-4 text-zinc-400">{formatDate(card.updated_at)}</td>
+                              <td className="px-5 py-4"><div className="flex items-center gap-2">
+                                <button type="button" onClick={() => void toggleLoyaltyHistory(card)} aria-label={`Historique client de ${card.profiles?.full_name || 'ce client'}`} title="Historique client" className="rounded-full border border-zinc-700 p-2 text-zinc-400 hover:border-amber-200 hover:text-amber-200"><History size={15} /></button>
+                                <button type="button" onClick={() => void adjustPoints(card.id, 1)} className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-amber-200 hover:text-amber-200">+1</button>
+                                <button type="button" onClick={() => void adjustPoints(card.id, -1)} disabled={card.points === 0} className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-amber-200 hover:text-amber-200 disabled:opacity-40">-1</button>
+                                <button type="button" onClick={() => void deleteLoyaltyCard(card)} disabled={Boolean(deletingLoyaltyCardId)} aria-label={`Supprimer la carte de ${card.profiles?.full_name || 'ce client'}`} title="Supprimer la carte fidélité" className="rounded-full border border-red-400/40 p-2 text-red-300 hover:border-red-300 hover:bg-red-400/10 disabled:cursor-wait disabled:opacity-50"><Trash2 size={15} /></button>
+                              </div></td>
+                            </tr>
+                            {historyCardId === card.id && <tr><td colSpan="5" className="bg-zinc-950/70 px-5 py-4">
+                              <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-200"><History size={14} /> Historique de {card.profiles?.full_name || 'ce client'}</h3>
+                              {isLoadingLoyaltyHistory ? <p className="text-sm text-zinc-500">Chargement de l’historique…</p>
+                                : loyaltyHistory.length === 0 ? <p className="text-sm text-zinc-500">Aucun point enregistré pour ce client.</p>
+                                  : <ul className="divide-y divide-zinc-800">{loyaltyHistory.map((event) => <li key={event.id} className="flex items-center justify-between gap-4 py-3 text-sm"><span className="text-zinc-400">{new Intl.DateTimeFormat('fr-CH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.created_at))}</span><strong className={event.point_delta > 0 ? 'text-emerald-400' : 'text-amber-200'}>{event.point_delta > 0 ? '+' : ''}{event.point_delta} point{Math.abs(event.point_delta) === 1 ? '' : 's'}</strong></li>)}</ul>}
+                            </td></tr>}
+                          </Fragment>
+                        ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </section>
@@ -1021,7 +1134,7 @@ function BarberAvailabilityCard({ barber, slots, selectedDate, onDateChange, onT
   return <article className="border border-zinc-800 bg-zinc-950/50 p-4 sm:p-5"><header className="flex items-center gap-3 border-b border-zinc-800 pb-4"><img src={barber.image_url} alt={barber.name} className="h-14 w-14 border border-zinc-700 object-cover" /><h4 className="font-display text-xl font-bold uppercase tracking-tight text-zinc-100">{barber.name}</h4><button type="button" onClick={onDeactivate} className="ml-auto text-[10px] font-bold uppercase tracking-wide text-red-300 hover:text-red-100">Retirer</button></header><div className="mt-5 grid gap-5 md:grid-cols-2"><section><div className="mb-3 flex items-center justify-between"><button type="button" onClick={() => setMonthCursor((date) => new Date(date.getFullYear(), date.getMonth() - 1, 1))} className="px-2 text-zinc-400 hover:text-amber-200" aria-label="Mois précédent">‹</button><p className="text-sm font-bold capitalize text-zinc-200">{label}</p><button type="button" onClick={() => setMonthCursor((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1))} className="px-2 text-zinc-400 hover:text-amber-200" aria-label="Mois suivant">›</button></div><div className="grid grid-cols-7 gap-1 text-center text-[10px] text-zinc-600">{['L','M','M','J','V','S','D'].map((day, index) => <span key={`${day}-${index}`} className="py-1">{day}</span>)}{calendarDays.map((day, index) => { if (!day) return <span key={`blank-${index}`} />; const date = toDate(day); const isPast = date < today; return <button key={date} type="button" disabled={isPast} onClick={() => onDateChange(date)} className={`relative h-8 rounded-sm text-xs transition ${selectedDate === date ? 'bg-amber-200 font-bold text-zinc-950' : isPast ? 'cursor-not-allowed text-zinc-800' : 'text-zinc-300 hover:bg-zinc-800'} ${dayHasSlot(date) && selectedDate !== date ? 'ring-1 ring-emerald-400/60' : ''}`}>{day}</button>})}</div></section><section><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Horaires · {selectedDate}</p><div className="grid grid-cols-3 gap-2">{suggestedTimes.map((time) => { const slot = timeSlots.find((item) => item.appointment_time.slice(0, 5) === time); const state = slot?.reserved_at ? 'reserved' : slot?.is_active ? 'open' : 'closed'; return <button type="button" key={time} disabled={state === 'reserved'} onClick={() => onToggleSlot(barber.id, selectedDate, time, slot)} className={`border px-2 py-3 font-mono text-sm transition ${state === 'reserved' ? 'cursor-not-allowed border-amber-200/40 bg-amber-200/10 text-amber-200' : state === 'open' ? 'border-emerald-400/60 bg-emerald-400/15 text-emerald-300' : 'border-zinc-800 text-zinc-500 hover:border-emerald-400/60 hover:text-emerald-300'}`}>{time}</button>})}</div></section></div></article>
 }
 
-function ReservationGroup({ group, pricesByService }) {
+function ReservationGroup({ group, pricesByService, onDeleteReservation, deletingReservationId }) {
   return (
     <section className="overflow-hidden border border-zinc-800 bg-zinc-900/35">
       <header className="flex items-center gap-3 border-b border-zinc-800 bg-zinc-900 px-5 py-4">
@@ -1030,9 +1143,9 @@ function ReservationGroup({ group, pricesByService }) {
         <span className="ml-auto text-xs text-zinc-500">{group.reservations.length} rendez-vous</span>
       </header>
       <div className="overflow-x-auto">
-        <table className="min-w-[780px] w-full text-left text-sm">
+        <table className="min-w-[840px] w-full text-left text-sm">
           <thead className="border-b border-zinc-800 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500">
-            <tr><th className="px-5 py-4">Client</th><th className="px-5 py-4">Téléphone</th><th className="px-5 py-4">Prestation</th><th className="px-5 py-4">Prix</th><th className="px-5 py-4">Date</th><th className="px-5 py-4">Heure</th><th className="px-5 py-4">Statut</th></tr>
+            <tr><th className="px-5 py-4">Client</th><th className="px-5 py-4">Téléphone</th><th className="px-5 py-4">Prestation</th><th className="px-5 py-4">Prix</th><th className="px-5 py-4">Date</th><th className="px-5 py-4">Heure</th><th className="px-5 py-4">Statut</th><th className="px-5 py-4">Action</th></tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
             {group.reservations.map((reservation) => (
@@ -1044,6 +1157,7 @@ function ReservationGroup({ group, pricesByService }) {
                 <td className="px-5 py-4 text-zinc-300">{formatDate(reservation.appointment_date)}</td>
                 <td className="px-5 py-4 font-mono text-zinc-300">{reservation.appointment_time?.slice(0, 5) ?? '—'}</td>
                 <td className="px-5 py-4"><span className={reservation.status === 'confirmed' ? 'text-emerald-400' : reservation.status === 'cancelled' ? 'text-zinc-500' : 'text-amber-200'}>{reservation.status === 'confirmed' ? 'Confirmé' : reservation.status === 'cancelled' ? 'Annulé' : 'En attente'}</span></td>
+                <td className="px-5 py-4"><button type="button" onClick={() => void onDeleteReservation(reservation)} disabled={Boolean(deletingReservationId)} aria-label={`Supprimer le rendez-vous de ${reservation.client_name}`} title="Supprimer le rendez-vous" className="rounded-full border border-red-400/40 p-2 text-red-300 hover:border-red-300 hover:bg-red-400/10 disabled:cursor-wait disabled:opacity-50"><Trash2 size={15} /></button></td>
               </tr>
             ))}
           </tbody>
