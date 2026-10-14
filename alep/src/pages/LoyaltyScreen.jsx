@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { CheckCircle2, Copy, Gift, History, LogIn, LogOut, Minus, Plus, Scissors, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Link } from 'react-router-dom'
@@ -27,6 +27,27 @@ export default function LoyaltyScreen() {
   const [toast, setToast] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  const refreshLoyaltyData = useCallback(async () => {
+    if (!session || !supabase) return
+    const { data: nextCard, error } = await supabase
+      .from('loyalty_cards')
+      .select('id, member_code, points, downloaded_at, updated_at')
+      .eq('profile_id', session.user.id)
+      .maybeSingle()
+    if (error) return
+    setCard(nextCard)
+    if (!nextCard) {
+      setPointEvents([])
+      return
+    }
+    const { data: events, error: eventsError } = await supabase
+      .from('loyalty_point_events')
+      .select('id, point_delta, created_at')
+      .eq('loyalty_card_id', nextCard.id)
+      .order('created_at', { ascending: false })
+    if (!eventsError) setPointEvents(events ?? [])
+  }, [session])
 
   useEffect(() => {
     if (!toast) return undefined
@@ -80,6 +101,27 @@ export default function LoyaltyScreen() {
     void loadLoyaltyData()
     return () => { mounted = false }
   }, [session])
+
+  // Realtime keeps the PWA in sync; polling also covers Supabase projects
+  // where Realtime has not yet been enabled for these tables.
+  useEffect(() => {
+    if (!session || !supabase || !card?.id) return undefined
+    let active = true
+    const refresh = () => { if (active) void refreshLoyaltyData() }
+    const channel = supabase.channel(`loyalty-client-${card.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'loyalty_cards', filter: `id=eq.${card.id}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'loyalty_point_events', filter: `loyalty_card_id=eq.${card.id}` }, refresh)
+      .subscribe()
+    const timer = window.setInterval(refresh, 4000)
+    const onFocus = () => refresh()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+      void supabase.removeChannel(channel)
+    }
+  }, [session, card?.id, refreshLoyaltyData])
 
   const handleGoogleLogin = async () => {
     setErrorMessage('')

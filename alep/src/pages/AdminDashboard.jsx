@@ -102,6 +102,18 @@ export default function AdminDashboard() {
     window.localStorage.setItem('alep-admin-language', nextLanguage)
   }
 
+  const refreshLoyaltyCards = useCallback(async () => {
+    if (!supabase) return
+    const { data, error } = await supabase
+      .from('loyalty_cards')
+      .select('id, member_code, points, downloaded_at, updated_at, profiles(full_name, first_name, last_name, email, phone, whatsapp)')
+      .order('updated_at', { ascending: false })
+    if (error) return
+    const cards = data ?? []
+    setLoyaltyCards(cards)
+    setSelectedLoyaltyCard((selected) => selected ? cards.find((card) => card.id === selected.id) ?? selected : null)
+  }, [])
+
   const loadDashboard = useCallback(async ({ clearFeedback = false } = {}) => {
     if (!supabase) return
     setIsLoading(true)
@@ -153,6 +165,23 @@ export default function AdminDashboard() {
     }, 0)
     return () => window.clearTimeout(timer)
   }, [loadDashboard])
+
+  useEffect(() => {
+    if (!supabase) return undefined
+    const refresh = () => { void refreshLoyaltyCards() }
+    const channel = supabase.channel('admin-loyalty-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'loyalty_cards' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'loyalty_point_events' }, refresh)
+      .subscribe()
+    const timer = window.setInterval(refresh, 4000)
+    const onFocus = () => refresh()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+      void supabase.removeChannel(channel)
+    }
+  }, [refreshLoyaltyCards])
 
   useEffect(() => {
     if (!isScanning) return undefined
@@ -261,7 +290,7 @@ export default function AdminDashboard() {
     if (error) setFeedback({ type: 'error', text: 'La visite ne peut pas être validée.' })
     else {
       setFeedback({ type: 'success', text: 'Visite validée : 1 point a été ajouté.' })
-      await loadDashboard()
+      await refreshLoyaltyCards()
     }
   }
 
@@ -274,7 +303,7 @@ export default function AdminDashboard() {
     if (error) setFeedback({ type: 'error', text: 'La modification des points a échoué.' })
     else {
       setFeedback({ type: 'success', text: `${delta > 0 ? '+' : ''}${delta} point appliqué.` })
-      await loadDashboard()
+      await refreshLoyaltyCards()
     }
   }
 
