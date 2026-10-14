@@ -94,7 +94,6 @@ export default function AdminDashboard() {
   const [historyCardId, setHistoryCardId] = useState(null)
   const [loyaltyHistory, setLoyaltyHistory] = useState([])
   const [isLoadingLoyaltyHistory, setIsLoadingLoyaltyHistory] = useState(false)
-  const [deletingLoyaltyCardId, setDeletingLoyaltyCardId] = useState(null)
   const [deletingReservationId, setDeletingReservationId] = useState(null)
   const [isScanning, setIsScanning] = useState(false)
   const [scannerMessage, setScannerMessage] = useState('')
@@ -308,6 +307,16 @@ export default function AdminDashboard() {
     }
   }
 
+  const refreshLoyaltyHistory = async (cardId) => {
+    if (historyCardId !== cardId) return
+    const { data, error } = await supabase
+      .from('loyalty_point_events')
+      .select('id, point_delta, created_at')
+      .eq('loyalty_card_id', cardId)
+      .order('created_at', { ascending: false })
+    if (!error) setLoyaltyHistory(data ?? [])
+  }
+
   const adjustPoints = async (cardId, delta) => {
     if (!supabase) return
     const { error } = await supabase.rpc('adjust_loyalty_points', {
@@ -318,6 +327,7 @@ export default function AdminDashboard() {
     else {
       setFeedback({ type: 'success', text: `${delta > 0 ? '+' : ''}${delta} point appliqué.` })
       await refreshLoyaltyCards()
+      await refreshLoyaltyHistory(cardId)
       await loyaltyLiveChannelRef.current?.send({
         type: 'broadcast',
         event: 'loyalty-points-updated',
@@ -348,32 +358,31 @@ export default function AdminDashboard() {
     setLoyaltyHistory(data ?? [])
   }
 
-  const deleteLoyaltyCard = async (card) => {
+  const resetLoyaltyPoints = async (card) => {
+    if (!supabase || card.points <= 0) return
     const clientName = card.profiles?.full_name || card.profiles?.email || 'ce client'
     const confirmation = language === 'DE'
-      ? `Die Treuekarte und der Punkteverlauf von ${clientName} löschen? Das Kundenprofil bleibt erhalten.`
-      : `Supprimer la carte fidélité et l’historique de ${clientName} ? Son profil client restera intact.`
-    if (!supabase || deletingLoyaltyCardId || !window.confirm(confirmation)) return
+      ? `Punktestand von ${clientName} auf null setzen? Der Verlauf bleibt erhalten.`
+      : `Remettre le compteur de ${clientName} à zéro ? Son historique sera conservé.`
+    if (!window.confirm(confirmation)) return
 
-    setDeletingLoyaltyCardId(card.id)
-    const { data, error } = await supabase
-      .from('loyalty_cards')
-      .delete()
-      .eq('id', card.id)
-      .select('id')
-      .maybeSingle()
-    if (error || !data) {
-      setFeedback({ type: 'error', text: error?.message || 'La carte fidélité n’a pas pu être supprimée.' })
-    } else {
-      setLoyaltyCards((current) => current.filter((item) => item.id !== card.id))
-      setSelectedLoyaltyCard((current) => current?.id === card.id ? null : current)
-      if (historyCardId === card.id) {
-        setHistoryCardId(null)
-        setLoyaltyHistory([])
-      }
-      setFeedback({ type: 'success', text: 'La carte fidélité et son historique ont été supprimés. Le profil client est conservé.' })
+    setFeedback(null)
+    const { error } = await supabase.rpc('adjust_loyalty_points', {
+      target_card_id: card.id,
+      point_delta: -card.points,
+    })
+    if (error) {
+      setFeedback({ type: 'error', text: 'Le compteur de points n’a pas pu être remis à zéro.' })
+      return
     }
-    setDeletingLoyaltyCardId(null)
+    setFeedback({ type: 'success', text: `Le compteur de ${clientName} est à zéro. Son historique est conservé.` })
+    await refreshLoyaltyCards()
+      await refreshLoyaltyHistory(card.id)
+    await loyaltyLiveChannelRef.current?.send({
+      type: 'broadcast',
+      event: 'loyalty-points-updated',
+      payload: { cardId: card.id },
+    })
   }
 
   const deleteReservation = async (reservation) => {
@@ -870,7 +879,7 @@ export default function AdminDashboard() {
                                 <button type="button" onClick={() => void toggleLoyaltyHistory(card)} aria-label={`Historique client de ${card.profiles?.full_name || 'ce client'}`} title="Historique client" className="rounded-full border border-zinc-700 p-2 text-zinc-400 hover:border-amber-200 hover:text-amber-200"><History size={15} /></button>
                                 <button type="button" onClick={() => void adjustPoints(card.id, 1)} className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-amber-200 hover:text-amber-200">+1</button>
                                 <button type="button" onClick={() => void adjustPoints(card.id, -1)} disabled={card.points === 0} className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-amber-200 hover:text-amber-200 disabled:opacity-40">-1</button>
-                                <button type="button" onClick={() => void deleteLoyaltyCard(card)} disabled={Boolean(deletingLoyaltyCardId)} aria-label={`Supprimer la carte de ${card.profiles?.full_name || 'ce client'}`} title="Supprimer la carte fidélité" className="rounded-full border border-red-400/40 p-2 text-red-300 hover:border-red-300 hover:bg-red-400/10 disabled:cursor-wait disabled:opacity-50"><Trash2 size={15} /></button>
+                                <button type="button" onClick={() => void resetLoyaltyPoints(card)} disabled={card.points === 0} aria-label={`Remettre à zéro le compteur de ${card.profiles?.full_name || 'ce client'}`} title="Remettre à zéro" className="rounded-full border border-zinc-700 p-2 text-zinc-400 hover:border-amber-200 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"><RefreshCw size={15} /></button>
                               </div></td>
                             </tr>
                             {historyCardId === card.id && <tr><td colSpan="5" className="bg-zinc-950/70 px-5 py-4">
