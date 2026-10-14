@@ -120,6 +120,24 @@ export default function AdminDashboard() {
     setSelectedLoyaltyCard((selected) => selected ? cards.find((card) => card.id === selected.id) ?? selected : null)
   }, [])
 
+  const refreshReception = useCallback(async () => {
+    if (!supabase) return
+    const [reservationsResult, slotsResult] = await Promise.all([
+      supabase
+        .from('reservations')
+        .select('id, client_name, client_phone, service_name, appointment_date, appointment_time, status, confirmed_at, created_at, availability_slot_id, availability_slots(barber_id, barbers(id, name, image_url))')
+        .order('appointment_date', { ascending: true })
+        .order('appointment_time', { ascending: true }),
+      supabase
+        .from('availability_slots')
+        .select('id, salon_id, barber_id, appointment_date, appointment_time, is_active, reserved_at')
+        .order('appointment_date')
+        .order('appointment_time'),
+    ])
+    if (!reservationsResult.error) setReservations(reservationsResult.data ?? [])
+    if (!slotsResult.error) setAvailabilitySlots(slotsResult.data ?? [])
+  }, [])
+
   const loadDashboard = useCallback(async ({ clearFeedback = false } = {}) => {
     if (!supabase) return
     setIsLoading(true)
@@ -190,6 +208,29 @@ export default function AdminDashboard() {
       void supabase.removeChannel(channel)
     }
   }, [refreshLoyaltyCards])
+
+  useEffect(() => {
+    if (!supabase) return undefined
+    const refresh = () => { void refreshReception() }
+    const channel = supabase.channel('admin-reception-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_slots' }, refresh)
+      .subscribe()
+    const timer = window.setInterval(refresh, 3000)
+    const onFocus = () => refresh()
+    const onVisibilityChange = () => { if (!document.hidden) refresh() }
+    const onPageShow = () => refresh()
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('pageshow', onPageShow)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('pageshow', onPageShow)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      void supabase.removeChannel(channel)
+    }
+  }, [refreshReception])
 
   useEffect(() => {
     if (!isScanning) return undefined
