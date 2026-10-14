@@ -1,0 +1,1012 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Camera,
+  CalendarDays,
+  Check,
+  ImageUp,
+  LogOut,
+  Plus,
+  QrCode,
+  RefreshCw,
+  Scissors,
+  Trash2,
+  Upload,
+  Users,
+} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { BARBER_ASSETS_BUCKET, SERVICE_ASSETS_BUCKET, supabase } from '../supabaseClient'
+import { BODY_COLOR_OPTIONS, BUTTON_COLOR_OPTIONS, FOOTER_COLOR_OPTIONS, LOGO_STYLE_OPTIONS } from '../siteBranding'
+
+const salonNames = {
+  bienne: 'Bienne',
+  neuchatel: 'Neuchâtel',
+  berne: 'Berne',
+}
+
+const categories = ['Coupes', 'Barbe', 'Soins']
+const suggestedTimes = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00']
+
+function formatDate(date) {
+  if (!date) return '—'
+  const parsedDate = new Date(date.includes('T') ? date : `${date}T12:00:00`)
+  if (Number.isNaN(parsedDate.getTime())) return '—'
+  return new Intl.DateTimeFormat('fr-CH', { dateStyle: 'medium' }).format(
+    parsedDate,
+  )
+}
+
+function getReservationBarber(reservation) {
+  const slot = Array.isArray(reservation.availability_slots)
+    ? reservation.availability_slots[0]
+    : reservation.availability_slots
+  const barber = Array.isArray(slot?.barbers) ? slot.barbers[0] : slot?.barbers
+  return barber ?? null
+}
+
+function getStorageObjectPath(publicUrl, bucket) {
+  if (!publicUrl) return null
+  const marker = `/storage/v1/object/public/${bucket}/`
+  const markerIndex = publicUrl.indexOf(marker)
+  if (markerIndex < 0) return null
+  try {
+    return decodeURIComponent(publicUrl.slice(markerIndex + marker.length).split('?')[0])
+  } catch {
+    return null
+  }
+}
+
+export default function AdminDashboard() {
+  const navigate = useNavigate()
+  const [language, setLanguage] = useState(() => window.localStorage.getItem('alep-admin-language') === 'DE' ? 'DE' : 'FR')
+  const [activeTab, setActiveTab] = useState('reservations')
+  const [reservations, setReservations] = useState([])
+  const [services, setServices] = useState([])
+  const [loyaltyCards, setLoyaltyCards] = useState([])
+  const [availabilitySlots, setAvailabilitySlots] = useState([])
+  const [barbers, setBarbers] = useState([])
+  const [heroImageUrl, setHeroImageUrl] = useState('')
+  const [siteBodyColor, setSiteBodyColor] = useState(BODY_COLOR_OPTIONS[0].value)
+  const [siteFooterColor, setSiteFooterColor] = useState(FOOTER_COLOR_OPTIONS[0].value)
+  const [siteButtonColor, setSiteButtonColor] = useState(BUTTON_COLOR_OPTIONS[0].value)
+  const [siteLogoStyle, setSiteLogoStyle] = useState('classic')
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSavingService, setIsSavingService] = useState(false)
+  const [serviceImageUploadId, setServiceImageUploadId] = useState(null)
+  const [serviceImageTitleDrafts, setServiceImageTitleDrafts] = useState({})
+  const [serviceImageTitleSavingId, setServiceImageTitleSavingId] = useState(null)
+  const [serviceDeleteId, setServiceDeleteId] = useState(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [isSavingBranding, setIsSavingBranding] = useState(false)
+  const [isSavingAvailability, setIsSavingAvailability] = useState(false)
+  const [isSavingBarber, setIsSavingBarber] = useState(false)
+  const [isClearingReservations, setIsClearingReservations] = useState(false)
+  const [feedback, setFeedback] = useState(null)
+  const [newService, setNewService] = useState({ category: 'Coupes', name: '', price: '' })
+  const [imageFile, setImageFile] = useState(null)
+  const [availabilityDraft, setAvailabilityDraft] = useState({ salonId: 'bienne', appointmentDate: new Date().toISOString().slice(0, 10) })
+  const [barberDraft, setBarberDraft] = useState({ salonId: 'bienne', name: '' })
+  const [barberFile, setBarberFile] = useState(null)
+  const [selectedBarberId, setSelectedBarberId] = useState('')
+  const [selectedSlotTimes, setSelectedSlotTimes] = useState([])
+  const [loyaltySearch, setLoyaltySearch] = useState('')
+  const [selectedLoyaltyCard, setSelectedLoyaltyCard] = useState(null)
+  const [isScanning, setIsScanning] = useState(false)
+  const [scannerMessage, setScannerMessage] = useState('')
+  const videoRef = useRef(null)
+  const labels = language === 'DE'
+    ? { admin: 'Administration', logout: 'Abmelden', private: 'Interne Verwaltung', dashboard: 'Dashboard', reservations: 'Buchungen', loyalty: 'Treueprogramm', availability: 'Verfügbarkeiten', management: 'Verwaltung', reservationsTitle: 'Kundenbuchungen', loyaltyTitle: 'Treuekarten', availabilityTitle: 'Verfügbarkeiten', clearReservations: 'Buchungen leeren', clearReservationsConfirm: 'Alle Buchungen löschen und reservierte Zeitfenster wieder freigeben? Treuekarten und Kundenprofile bleiben unverändert.', clearReservationsDone: 'Alle Buchungen wurden gelöscht; reservierte Zeitfenster sind wieder frei.' }
+    : { admin: 'Espace administration', logout: 'Déconnexion', private: 'Gestion privée', dashboard: 'Tableau de bord', reservations: 'Réservations', loyalty: 'Fidélité', availability: 'Disponibilités', management: 'Gestion', reservationsTitle: 'Réservations clients', loyaltyTitle: 'Cartes de fidélité', availabilityTitle: 'Disponibilités', clearReservations: 'Vider les réservations', clearReservationsConfirm: 'Supprimer toutes les réservations et libérer les créneaux réservés ? Les cartes de fidélité et les profils clients resteront inchangés.', clearReservationsDone: 'Toutes les réservations ont été supprimées et les créneaux réservés ont été libérés.' }
+
+  const changeLanguage = (nextLanguage) => {
+    setLanguage(nextLanguage)
+    window.localStorage.setItem('alep-admin-language', nextLanguage)
+  }
+
+  const loadDashboard = useCallback(async ({ clearFeedback = false } = {}) => {
+    if (!supabase) return
+    setIsLoading(true)
+    if (clearFeedback) setFeedback(null)
+
+    const [reservationsResult, servicesResult, loyaltyResult, availabilityResult, barbersResult, heroSettingsResult] = await Promise.all([
+      supabase
+        .from('reservations')
+        .select('id, client_name, client_phone, service_name, appointment_date, appointment_time, status, confirmed_at, created_at, availability_slots(barber_id, barbers(id, name, image_url))')
+        .order('appointment_date', { ascending: true })
+        .order('appointment_time', { ascending: true }),
+      supabase.from('services').select('id, category, name, price, image_url, image_title').order('category').order('name'),
+      supabase
+        .from('loyalty_cards')
+        .select('id, member_code, points, downloaded_at, updated_at, profiles(full_name, first_name, last_name, email, phone, whatsapp)')
+        .order('updated_at', { ascending: false }),
+      supabase
+        .from('availability_slots')
+        .select('id, salon_id, barber_id, appointment_date, appointment_time, is_active, reserved_at')
+        .order('appointment_date')
+        .order('appointment_time'),
+      supabase.from('barbers').select('id, salon_id, name, image_url, is_active').order('name'),
+      supabase.from('site_settings').select('hero_image_url, body_color, footer_color, button_color, logo_style').eq('id', true).maybeSingle(),
+    ])
+
+    const firstError = reservationsResult.error || servicesResult.error || loyaltyResult.error || availabilityResult.error || barbersResult.error
+    if (firstError) {
+      setFeedback({ type: 'error', text: 'Les données ne peuvent pas être chargées. Vérifiez les droits administrateur RLS.' })
+    } else {
+      setReservations(reservationsResult.data ?? [])
+      setServices(servicesResult.data ?? [])
+      setLoyaltyCards(loyaltyResult.data ?? [])
+      setAvailabilitySlots(availabilityResult.data ?? [])
+      setBarbers(barbersResult.data ?? [])
+      if (!heroSettingsResult.error) {
+        setHeroImageUrl(heroSettingsResult.data?.hero_image_url ?? '')
+        setSiteBodyColor(heroSettingsResult.data?.body_color ?? BODY_COLOR_OPTIONS[0].value)
+        setSiteFooterColor(heroSettingsResult.data?.footer_color ?? FOOTER_COLOR_OPTIONS[0].value)
+        setSiteButtonColor(heroSettingsResult.data?.button_color ?? BUTTON_COLOR_OPTIONS[0].value)
+        setSiteLogoStyle(heroSettingsResult.data?.logo_style ?? 'classic')
+      }
+    }
+    setIsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadDashboard()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadDashboard])
+
+  useEffect(() => {
+    if (!isScanning) return undefined
+    let stream
+    let timer
+    let isActive = true
+
+    const startScanner = async () => {
+      if (!('BarcodeDetector' in window)) {
+        setScannerMessage('Le scanner QR n’est pas pris en charge par ce navigateur. Utilisez la saisie manuelle du code.')
+        setIsScanning(false)
+        return
+      }
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        })
+        if (!isActive || !videoRef.current) return
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+        const detector = new window.BarcodeDetector({ formats: ['qr_code'] })
+        timer = window.setInterval(async () => {
+          if (!videoRef.current || !isActive) return
+          const codes = await detector.detect(videoRef.current)
+          const scannedCode = codes[0]?.rawValue?.replace('ALEP-LOYALTY:', '').trim()
+          if (!scannedCode) return
+          const card = loyaltyCards.find((item) => item.member_code === scannedCode)
+          setSelectedLoyaltyCard(card ?? null)
+          setLoyaltySearch(scannedCode)
+          setScannerMessage(card ? 'Carte trouvée. Validez la visite ci-dessous.' : 'Aucune carte ne correspond à ce QR code.')
+          setIsScanning(false)
+        }, 700)
+      } catch {
+        setScannerMessage('Impossible d’accéder à la caméra. Autorisez la caméra ou saisissez le code manuellement.')
+        setIsScanning(false)
+      }
+    }
+
+    void startScanner()
+    return () => {
+      isActive = false
+      if (timer) window.clearInterval(timer)
+      stream?.getTracks().forEach((track) => track.stop())
+    }
+  }, [isScanning, loyaltyCards])
+
+  const upcomingReservationCount = useMemo(() => {
+    const dateParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Zurich', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date())
+    const today = `${dateParts.find((part) => part.type === 'year')?.value}-${dateParts.find((part) => part.type === 'month')?.value}-${dateParts.find((part) => part.type === 'day')?.value}`
+    return reservations.filter((reservation) => reservation.status !== 'cancelled' && reservation.appointment_date >= today).length
+  }, [reservations])
+
+  const reservationGroups = useMemo(() => {
+    const groups = new Map()
+    reservations.forEach((reservation) => {
+      const barber = getReservationBarber(reservation)
+      const key = barber?.id ?? 'unassigned'
+      if (!groups.has(key)) {
+        groups.set(key, {
+          id: key,
+          name: barber?.name ?? 'Barbier non attribué',
+          imageUrl: barber?.image_url ?? null,
+          reservations: [],
+        })
+      }
+      groups.get(key).reservations.push(reservation)
+    })
+    return [...groups.values()].sort((left, right) => left.name.localeCompare(right.name, 'fr-CH'))
+  }, [reservations])
+
+  const pricesByService = useMemo(
+    () => new Map(services.map((service) => [service.name, service.price])),
+    [services],
+  )
+
+  const filteredLoyaltyCards = useMemo(() => {
+    const term = loyaltySearch.trim().toLowerCase()
+    if (!term) return loyaltyCards
+    return loyaltyCards.filter((card) =>
+      card.member_code.toLowerCase().includes(term)
+      || card.profiles?.full_name?.toLowerCase().includes(term)
+      || card.profiles?.email?.toLowerCase().includes(term)
+      || card.profiles?.phone?.toLowerCase().includes(term),
+    )
+  }, [loyaltyCards, loyaltySearch])
+
+  const selectLoyaltyCard = () => {
+    const match = loyaltyCards.find((card) => card.member_code === loyaltySearch.trim())
+      || loyaltyCards.find((card) => card.profiles?.full_name?.toLowerCase() === loyaltySearch.trim().toLowerCase())
+      || loyaltyCards.find((card) => card.profiles?.phone === loyaltySearch.trim())
+    setSelectedLoyaltyCard(match ?? null)
+    setScannerMessage(match ? 'Carte trouvée. Validez la visite.' : 'Aucune carte ne correspond à ce code ou ce nom.')
+  }
+
+  const validateVisit = async (cardId) => {
+    if (!supabase) return
+    setFeedback(null)
+    const { error } = await supabase.rpc('adjust_loyalty_points', {
+      target_card_id: cardId,
+      point_delta: 1,
+    })
+    if (error) setFeedback({ type: 'error', text: 'La visite ne peut pas être validée.' })
+    else {
+      setFeedback({ type: 'success', text: 'Visite validée : 1 point a été ajouté.' })
+      await loadDashboard()
+    }
+  }
+
+  const adjustPoints = async (cardId, delta) => {
+    if (!supabase) return
+    const { error } = await supabase.rpc('adjust_loyalty_points', {
+      target_card_id: cardId,
+      point_delta: delta,
+    })
+    if (error) setFeedback({ type: 'error', text: 'La modification des points a échoué.' })
+    else {
+      setFeedback({ type: 'success', text: `${delta > 0 ? '+' : ''}${delta} point appliqué.` })
+      await loadDashboard()
+    }
+  }
+
+  const handleAddService = async (event) => {
+    event.preventDefault()
+    if (!supabase || !newService.name.trim() || !newService.price.trim()) return
+
+    setIsSavingService(true)
+    setFeedback(null)
+    const { error } = await supabase.from('services').insert({
+      category: newService.category,
+      name: newService.name.trim(),
+      price: newService.price.trim(),
+    })
+
+    if (error) {
+      setFeedback({ type: 'error', text: 'Impossible d’ajouter cette prestation.' })
+    } else {
+      setNewService({ category: 'Coupes', name: '', price: '' })
+      setFeedback({ type: 'success', text: 'La prestation a été ajoutée.' })
+      await loadDashboard()
+    }
+    setIsSavingService(false)
+  }
+
+  const handleDeleteService = async (service) => {
+    if (!supabase || serviceDeleteId) return
+    const confirmed = window.confirm(`Supprimer la prestation « ${service.name} » ? Cette action est définitive.`)
+    if (!confirmed) return
+
+    setServiceDeleteId(service.id)
+    setFeedback(null)
+    const { error } = await supabase.from('services').delete().eq('id', service.id)
+    if (error) {
+      setFeedback({ type: 'error', text: `Impossible de supprimer « ${service.name} ».` })
+      setServiceDeleteId(null)
+      return
+    }
+
+    const imagePath = getStorageObjectPath(service.image_url, SERVICE_ASSETS_BUCKET)
+    let imageCleanupFailed = false
+    if (imagePath?.startsWith(`services/${service.id}/`)) {
+      const { error: cleanupError } = await supabase.storage.from(SERVICE_ASSETS_BUCKET).remove([imagePath])
+      imageCleanupFailed = Boolean(cleanupError)
+    }
+    setServiceImageTitleDrafts((drafts) => {
+      const nextDrafts = { ...drafts }
+      delete nextDrafts[service.id]
+      return nextDrafts
+    })
+    setFeedback({
+      type: 'success',
+      text: imageCleanupFailed
+        ? `La prestation « ${service.name} » a été supprimée. Son fichier photo reste dans le stockage.`
+        : `La prestation « ${service.name} » a été supprimée.`,
+    })
+    setServiceDeleteId(null)
+    await loadDashboard()
+  }
+
+  const handleSaveServiceImageTitle = async (service) => {
+    if (!supabase || serviceImageTitleSavingId) return
+    setServiceImageTitleSavingId(service.id)
+    setFeedback(null)
+    const title = serviceImageTitleDrafts[service.id]?.trim() ?? service.image_title ?? ''
+    const { error } = await supabase.from('services').update({ image_title: title || null }).eq('id', service.id)
+    if (error) {
+      setFeedback({ type: 'error', text: 'Impossible d’enregistrer le titre de la photo.' })
+    } else {
+      setFeedback({ type: 'success', text: `Titre enregistré pour « ${service.name} ».` })
+      await loadDashboard()
+    }
+    setServiceImageTitleSavingId(null)
+  }
+
+  const handleServiceImageUpload = async (event, service) => {
+    const input = event.currentTarget
+    const file = input.files?.[0]
+    input.value = ''
+    if (!supabase || !file) return
+    if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+      setFeedback({ type: 'error', text: 'Choisissez une image JPG, PNG ou WebP de 5 Mo maximum.' })
+      return
+    }
+
+    setServiceImageUploadId(service.id)
+    setFeedback(null)
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const path = `services/${service.id}/${globalThis.crypto.randomUUID()}.${extension}`
+    const imageTitle = serviceImageTitleDrafts[service.id]?.trim() ?? service.image_title ?? ''
+    const { error: uploadError } = await supabase.storage
+      .from(SERVICE_ASSETS_BUCKET)
+      .upload(path, file, { cacheControl: '31536000', contentType: file.type, upsert: false })
+
+    if (uploadError) {
+      setFeedback({ type: 'error', text: 'Impossible de téléverser cette image. Vérifiez la migration des images de services.' })
+      setServiceImageUploadId(null)
+      return
+    }
+
+    const { data: publicUrlData } = supabase.storage.from(SERVICE_ASSETS_BUCKET).getPublicUrl(path)
+    const { error: updateError } = await supabase
+      .from('services')
+      .update({ image_url: publicUrlData.publicUrl, image_title: imageTitle || null })
+      .eq('id', service.id)
+
+    if (updateError) {
+      await supabase.storage.from(SERVICE_ASSETS_BUCKET).remove([path])
+      setFeedback({ type: 'error', text: 'L’image a été téléversée, mais le service n’a pas pu être mis à jour.' })
+      setServiceImageUploadId(null)
+      return
+    }
+
+    const oldPath = getStorageObjectPath(service.image_url, SERVICE_ASSETS_BUCKET)
+    if (oldPath?.startsWith(`services/${service.id}/`)) {
+      await supabase.storage.from(SERVICE_ASSETS_BUCKET).remove([oldPath])
+    }
+    setFeedback({ type: 'success', text: `Image mise à jour pour « ${service.name} ».` })
+    setServiceImageUploadId(null)
+    await loadDashboard()
+  }
+
+  const handleRemoveServiceImage = async (service) => {
+    if (!supabase || !service.image_url) return
+    setServiceImageUploadId(service.id)
+    setFeedback(null)
+    const { error } = await supabase.from('services').update({ image_url: null, image_title: null }).eq('id', service.id)
+    if (error) {
+      setFeedback({ type: 'error', text: 'Impossible de retirer cette image.' })
+      setServiceImageUploadId(null)
+      return
+    }
+    const path = getStorageObjectPath(service.image_url, SERVICE_ASSETS_BUCKET)
+    if (path?.startsWith(`services/${service.id}/`)) {
+      await supabase.storage.from(SERVICE_ASSETS_BUCKET).remove([path])
+    }
+    setServiceImageTitleDrafts((drafts) => ({ ...drafts, [service.id]: '' }))
+    setFeedback({ type: 'success', text: `Image retirée pour « ${service.name} ».` })
+    setServiceImageUploadId(null)
+    await loadDashboard()
+  }
+
+  const handleAddAvailability = async (event) => {
+    event.preventDefault()
+    if (!supabase || !selectedBarberId || selectedSlotTimes.length === 0) {
+      setFeedback({ type: 'error', text: 'Choisissez un barbier et au moins une heure.' })
+      return
+    }
+    setIsSavingAvailability(true)
+    setFeedback(null)
+    const { error } = await supabase.from('availability_slots').insert(selectedSlotTimes.map((appointmentTime) => ({
+      salon_id: availabilityDraft.salonId,
+      barber_id: selectedBarberId,
+      appointment_date: availabilityDraft.appointmentDate,
+      appointment_time: appointmentTime,
+    })))
+    setIsSavingAvailability(false)
+    if (error) {
+      setFeedback({ type: 'error', text: 'Un ou plusieurs créneaux existent déjà ou ne peuvent pas être ajoutés.' })
+      return
+    }
+    setSelectedSlotTimes([])
+    setFeedback({ type: 'success', text: 'Créneaux ajoutés. Les clients peuvent maintenant les réserver.' })
+    await loadDashboard()
+  }
+
+  const toggleSuggestedTime = (time) => {
+    setSelectedSlotTimes((times) => times.includes(time) ? times.filter((item) => item !== time) : [...times, time])
+  }
+
+  const handleAddBarber = async (event) => {
+    event.preventDefault()
+    if (!supabase || !barberDraft.name.trim() || !barberFile) {
+      setFeedback({ type: 'error', text: 'Ajoutez le nom et une photo du barbier.' })
+      return
+    }
+    if (!barberFile.type.startsWith('image/') || barberFile.size > 5 * 1024 * 1024) {
+      setFeedback({ type: 'error', text: 'Utilisez une image JPG, PNG ou WebP de 5 Mo maximum.' })
+      return
+    }
+    setIsSavingBarber(true)
+    setFeedback(null)
+    const extension = barberFile.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const safeName = barberDraft.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'barbier'
+    const path = `barbers/${barberDraft.salonId}/${globalThis.crypto?.randomUUID?.() ?? Date.now()}-${safeName}.${extension}`
+    const { error: uploadError } = await supabase.storage.from(BARBER_ASSETS_BUCKET).upload(path, barberFile, { cacheControl: '31536000', contentType: barberFile.type, upsert: false })
+    if (uploadError) {
+      setIsSavingBarber(false)
+      setFeedback({ type: 'error', text: 'Le téléversement de la photo a échoué.' })
+      return
+    }
+    const { data: publicUrlData } = supabase.storage.from(BARBER_ASSETS_BUCKET).getPublicUrl(path)
+    const { data: barber, error } = await supabase.from('barbers').insert({ salon_id: barberDraft.salonId, name: barberDraft.name.trim(), image_url: publicUrlData.publicUrl }).select('id').single()
+    setIsSavingBarber(false)
+    if (error) {
+      await supabase.storage.from(BARBER_ASSETS_BUCKET).remove([path])
+      setFeedback({ type: 'error', text: 'Le barbier ne peut pas être ajouté.' })
+      return
+    }
+    setBarberDraft((draft) => ({ ...draft, name: '' }))
+    setBarberFile(null)
+    const input = document.getElementById('barber-image-upload')
+    if (input) input.value = ''
+    setSelectedBarberId(barber.id)
+    setFeedback({ type: 'success', text: 'Barbier ajouté. Vous pouvez maintenant ouvrir ses créneaux.' })
+    await loadDashboard()
+  }
+
+  const deactivateAvailability = async (slotId) => {
+    if (!supabase) return
+    setFeedback(null)
+    const { error } = await supabase
+      .from('availability_slots')
+      .update({ is_active: false })
+      .eq('id', slotId)
+      .is('reserved_at', null)
+    if (error) {
+      setFeedback({ type: 'error', text: 'Ce créneau ne peut pas être retiré.' })
+      return
+    }
+    setFeedback({ type: 'success', text: 'Créneau retiré des disponibilités.' })
+    await loadDashboard()
+  }
+
+  const toggleAvailabilityCell = async (barberId, appointmentDate, appointmentTime, existingSlot) => {
+    if (!supabase || !barberId) return
+    if (existingSlot?.reserved_at) {
+      setFeedback({ type: 'error', text: 'Un créneau réservé ne peut pas être modifié.' })
+      return
+    }
+
+    setFeedback(null)
+    const { error } = existingSlot
+      ? await supabase.from('availability_slots').update({ is_active: !existingSlot.is_active }).eq('id', existingSlot.id)
+      : await supabase.from('availability_slots').insert({
+        salon_id: availabilityDraft.salonId,
+        barber_id: barberId,
+        appointment_date: appointmentDate,
+        appointment_time: appointmentTime,
+      })
+
+    if (error) {
+      setFeedback({ type: 'error', text: 'Le créneau ne peut pas être modifié. Actualisez puis réessayez.' })
+      return
+    }
+    setFeedback({ type: 'success', text: existingSlot?.is_active ? 'Créneau fermé.' : 'Créneau disponible.' })
+    await loadDashboard()
+  }
+
+  const deactivateBarber = async (barberId) => {
+    if (!supabase || !barberId) return
+    setFeedback(null)
+    const { error } = await supabase
+      .from('barbers')
+      .update({ is_active: false })
+      .eq('id', barberId)
+    if (error) {
+      setFeedback({ type: 'error', text: 'Le barbier ne peut pas etre retire.' })
+      return
+    }
+    if (selectedBarberId === barberId) setSelectedBarberId('')
+    setSelectedSlotTimes([])
+    setFeedback({ type: 'success', text: 'Barbier retire. Ses anciens rendez-vous sont conserves.' })
+    await loadDashboard()
+  }
+
+  const handleImageUpload = async (event) => {
+    event.preventDefault()
+    if (!supabase || !imageFile) return
+
+    if (!imageFile.type.startsWith('image/')) {
+      setFeedback({ type: 'error', text: 'Sélectionnez un fichier image valide.' })
+      return
+    }
+    if (imageFile.size > 5 * 1024 * 1024) {
+      setFeedback({ type: 'error', text: 'L’image ne doit pas dépasser 5 Mo.' })
+      return
+    }
+
+    setIsUploading(true)
+    setFeedback(null)
+    const extension = imageFile.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const safeName = imageFile.name
+      .replace(/\.[^.]+$/, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+    const uniqueId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`
+    const path = `hero/${uniqueId}-${safeName || 'photo'}.${extension}`
+
+    const { error: uploadError } = await supabase.storage
+      .from(BARBER_ASSETS_BUCKET)
+      .upload(path, imageFile, {
+        cacheControl: '31536000',
+        contentType: imageFile.type,
+        upsert: false,
+      })
+
+    if (uploadError) {
+      setFeedback({ type: 'error', text: 'Le téléversement de l’image a échoué.' })
+      setIsUploading(false)
+      return
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(BARBER_ASSETS_BUCKET)
+      .getPublicUrl(path)
+
+    const { error: updateError } = await supabase
+      .from('site_settings')
+      .upsert({ id: true, hero_image_url: publicUrlData.publicUrl }, { onConflict: 'id' })
+
+    if (updateError) {
+      await supabase.storage.from(BARBER_ASSETS_BUCKET).remove([path])
+      setFeedback({ type: 'error', text: 'La photo a été téléversée, mais le hero n’a pas été mis à jour. Exécutez hero-image-migration.sql.' })
+    } else {
+      const oldPath = getStorageObjectPath(heroImageUrl, BARBER_ASSETS_BUCKET)
+      if (oldPath?.startsWith('hero/')) await supabase.storage.from(BARBER_ASSETS_BUCKET).remove([oldPath])
+      setHeroImageUrl(publicUrlData.publicUrl)
+      setImageFile(null)
+      const input = document.getElementById('hero-image-upload')
+      if (input) input.value = ''
+      setFeedback({ type: 'success', text: 'La photo du hero a été mise à jour.' })
+      await loadDashboard()
+    }
+    setIsUploading(false)
+  }
+
+  const handleSaveBranding = async () => {
+    if (!supabase || isSavingBranding) return
+    setIsSavingBranding(true)
+    setFeedback(null)
+    const { error } = await supabase
+      .from('site_settings')
+      .update({ body_color: siteBodyColor, footer_color: siteFooterColor, button_color: siteButtonColor, logo_style: siteLogoStyle })
+      .eq('id', true)
+
+    if (error) {
+      setFeedback({ type: 'error', text: 'Impossible d’enregistrer le design. Exécutez la migration hero-image-migration.sql.' })
+    } else {
+      setFeedback({ type: 'success', text: 'Les couleurs et le logo ont été enregistrés.' })
+      await loadDashboard()
+    }
+    setIsSavingBranding(false)
+  }
+
+  const handleSignOut = async () => {
+    await supabase?.auth.signOut()
+    navigate('/', { replace: true })
+  }
+
+  const handleClearReservations = async () => {
+    if (!supabase || isClearingReservations || !window.confirm(labels.clearReservationsConfirm)) return
+    setIsClearingReservations(true)
+    setFeedback(null)
+    const { error } = await supabase.rpc('clear_client_reservations')
+    if (error) {
+      setFeedback({ type: 'error', text: language === 'DE'
+        ? `Löschen fehlgeschlagen: ${error.message}. Migration clear-client-records-migration.sql ausführen und Admin-Zugang prüfen.`
+        : `La suppression a échoué : ${error.message}. Exécutez clear-client-records-migration.sql dans le bon projet Supabase et vérifiez l’accès admin.` })
+    } else {
+      setFeedback({ type: 'success', text: labels.clearReservationsDone })
+      await loadDashboard()
+    }
+    setIsClearingReservations(false)
+  }
+
+  const barbersForSelectedSalon = barbers.filter((barber) => barber.is_active && barber.salon_id === availabilityDraft.salonId)
+  const selectedBarberSlots = availabilitySlots.filter((slot) => slot.barber_id === selectedBarberId && slot.appointment_date === availabilityDraft.appointmentDate)
+
+  return (
+    <main className="min-h-screen bg-zinc-950 text-zinc-100">
+      <header className="border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
+          <div className="flex items-center gap-3">
+            <LogoStylePreview style={siteLogoStyle} />
+            <p className="border-l border-zinc-700 pl-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">{labels.admin}</p>
+          </div>
+          <div className="flex items-center justify-between gap-4 sm:justify-end">
+            <div className="flex items-center gap-1 rounded-full border border-zinc-800 p-1" aria-label="Langue">
+              {['FR', 'DE'].map((option) => <button key={option} type="button" onClick={() => changeLanguage(option)} aria-pressed={language === option} className={`rounded-full px-3 py-1.5 text-[10px] font-bold tracking-wider transition ${language === option ? 'bg-amber-200 text-zinc-950' : 'text-zinc-400 hover:text-white'}`}>{option}</button>)}
+            </div>
+            <button type="button" className="button-ghost !min-h-0 !px-4 !py-2.5 text-[10px]" onClick={handleSignOut}>
+              <LogOut size={15} /> {labels.logout}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-[1440px] px-5 py-10 sm:px-8 lg:px-10">
+        <div className="mb-9 flex flex-col gap-5 border-b border-zinc-800 pb-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-amber-200">{labels.private}</p>
+            <h1 className="font-display text-5xl font-bold uppercase leading-none tracking-tight sm:text-6xl">{labels.dashboard}</h1>
+          </div>
+          <div className="flex w-full gap-2 sm:w-auto">
+            <DashboardTab active={activeTab === 'reservations'} onClick={() => setActiveTab('reservations')} icon={<CalendarDays size={15} />}>
+              {labels.reservations}
+            </DashboardTab>
+            <DashboardTab active={activeTab === 'loyalty'} onClick={() => setActiveTab('loyalty')} icon={<QrCode size={15} />}>
+              {labels.loyalty}
+            </DashboardTab>
+            <DashboardTab active={activeTab === 'availability'} onClick={() => setActiveTab('availability')} icon={<CalendarDays size={15} />}>
+              {labels.availability}
+            </DashboardTab>
+            <DashboardTab active={activeTab === 'cms'} onClick={() => setActiveTab('cms')} icon={<ImageUp size={15} />}>
+              {labels.management}
+            </DashboardTab>
+          </div>
+        </div>
+
+        {feedback && (
+          <div role="status" className={`mb-6 border-l-2 px-4 py-3 text-sm ${feedback.type === 'success' ? 'border-emerald-400 bg-emerald-400/5 text-emerald-100' : 'border-amber-200 bg-amber-200/5 text-amber-100'}`}>
+            {feedback.text}
+          </div>
+        )}
+
+        {activeTab === 'reservations' ? (
+          <section>
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="flex items-center gap-2 font-display text-3xl font-bold uppercase tracking-tight"><Users size={22} className="text-amber-200" /> {labels.reservationsTitle}</h2>
+                <p className="mt-2 text-sm text-zinc-500">{upcomingReservationCount} {language === 'DE' ? 'bevorstehende Termine' : `rendez-vous à venir${upcomingReservationCount > 1 ? 's' : ''}`}.</p>
+              </div>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+                <button type="button" onClick={() => void handleClearReservations()} disabled={isClearingReservations} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-red-400/50 px-4 text-[10px] font-bold uppercase tracking-wider text-red-300 transition hover:border-red-300 hover:bg-red-400/10 disabled:cursor-wait disabled:opacity-50">
+                  <Trash2 size={14} />{isClearingReservations ? (language === 'DE' ? 'Lösche…' : 'Suppression…') : labels.clearReservations}
+                </button>
+              </div>
+            </div>
+
+            {isLoading ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Chargement des réservations…</p> : reservationGroups.length === 0 ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Aucune réservation pour le moment.</p> : <div className="space-y-6">{reservationGroups.map((group) => <ReservationGroup key={group.id} group={group} pricesByService={pricesByService} />)}</div>}
+          </section>
+        ) : activeTab === 'loyalty' ? (
+          <section>
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="flex items-center gap-2 font-display text-3xl font-bold uppercase tracking-tight"><QrCode size={22} className="text-amber-200" /> {labels.loyaltyTitle}</h2>
+                <p className="mt-2 text-sm text-zinc-500">{loyaltyCards.length} client{loyaltyCards.length === 1 ? '' : 's'} inscrit{loyaltyCards.length === 1 ? '' : 's'} au programme.</p>
+              </div>
+              <button type="button" className="button-primary !min-h-0 !px-4 !py-3 text-[10px]" onClick={() => { setScannerMessage(''); setIsScanning(true) }}><Camera size={15} /> Scanner un QR code</button>
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+              <article className="border border-zinc-800 bg-zinc-900/35 p-6">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-200">Validation de visite</p>
+                {isScanning && <div className="mt-5 overflow-hidden border border-amber-200/50 bg-black"><video ref={videoRef} muted playsInline className="aspect-video w-full object-cover" /><button type="button" className="w-full border-t border-zinc-800 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-zinc-100" onClick={() => setIsScanning(false)}>Arrêter la caméra</button></div>}
+                {!isScanning && <><label className="mt-5 block"><span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Code QR ou nom du client</span><div className="flex gap-2"><input value={loyaltySearch} onChange={(event) => setLoyaltySearch(event.target.value)} className="dashboard-input" placeholder="Scannez ou collez le code" /><button type="button" onClick={selectLoyaltyCard} className="border border-zinc-700 px-4 text-[10px] font-bold uppercase tracking-widest text-zinc-300 hover:border-amber-200 hover:text-amber-200">Trouver</button></div></label>{scannerMessage && <p className="mt-3 text-xs leading-5 text-zinc-400">{scannerMessage}</p>}</>}
+                {selectedLoyaltyCard && <div className="mt-6 border border-amber-200/40 bg-amber-200/5 p-5"><p className="font-display text-2xl font-bold uppercase">{selectedLoyaltyCard.profiles?.full_name || 'Client fidélité'}</p><p className="mt-1 text-xs text-zinc-400">E-mail : {selectedLoyaltyCard.profiles?.email || 'Non disponible'}</p><p className="mt-1 text-xs text-zinc-400">WhatsApp : {selectedLoyaltyCard.profiles?.whatsapp || 'Non disponible'}</p><p className="mt-1 font-mono text-xs text-zinc-500">{selectedLoyaltyCard.member_code}</p><p className="mt-5 text-sm text-zinc-300"><strong className="text-4xl text-amber-200">{selectedLoyaltyCard.points}</strong> points actuels</p><button type="button" className="button-primary mt-5 w-full" onClick={() => void validateVisit(selectedLoyaltyCard.id)}><Check size={16} /> Valider la visite · +1 point</button></div>}
+              </article>
+
+              <div className="overflow-x-auto border border-zinc-800 bg-zinc-900/35">
+                <table className="min-w-[720px] w-full text-left text-sm"><thead className="border-b border-zinc-800 bg-zinc-900 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500"><tr><th className="px-5 py-4">Client</th><th className="px-5 py-4">Code membre</th><th className="px-5 py-4">Points</th><th className="px-5 py-4">Dernière activité</th><th className="px-5 py-4">Actions</th></tr></thead><tbody className="divide-y divide-zinc-800">{isLoading ? <tr><td colSpan="5" className="px-5 py-14 text-center text-zinc-500">Chargement des cartes…</td></tr> : filteredLoyaltyCards.length === 0 ? <tr><td colSpan="5" className="px-5 py-14 text-center text-zinc-500">Aucune carte trouvée.</td></tr> : filteredLoyaltyCards.map((card) => <tr key={card.id} className="hover:bg-zinc-900/80"><td className="px-5 py-4"><span className="block font-semibold text-zinc-200">{card.profiles?.full_name || 'Client fidélité'}</span><span className="mt-1 block text-xs text-zinc-500">{card.profiles?.email || 'E-mail non disponible'}</span><span className="mt-1 block text-xs text-zinc-600">WhatsApp : {card.profiles?.whatsapp || '—'}</span></td><td className="px-5 py-4 font-mono text-xs text-zinc-500">{card.member_code.slice(0, 8)}…</td><td className="px-5 py-4"><span className="font-display text-2xl text-amber-200">{card.points}</span></td><td className="px-5 py-4 text-zinc-400">{formatDate(card.updated_at)}</td><td className="px-5 py-4"><div className="flex gap-2"><button type="button" onClick={() => void adjustPoints(card.id, 1)} className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-amber-200 hover:text-amber-200">+1</button><button type="button" onClick={() => void adjustPoints(card.id, -1)} disabled={card.points === 0} className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-amber-200 hover:text-amber-200">−1</button></div></td></tr>)}</tbody></table>
+              </div>
+            </div>
+          </section>
+        ) : activeTab === 'availability' ? (
+          <section>
+            <div className="mb-6">
+              <h2 className="flex items-center gap-2 font-display text-3xl font-bold uppercase tracking-tight"><CalendarDays size={22} className="text-amber-200" /> {labels.availabilityTitle}</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Ajoutez les créneaux que les clients peuvent réserver. Une fois réservé, un créneau disparaît automatiquement de leur calendrier.</p>
+            </div>
+            <AvailabilityConfiguration availabilityDraft={availabilityDraft} setAvailabilityDraft={setAvailabilityDraft} barbers={barbersForSelectedSalon} allSlots={availabilitySlots.filter((slot) => slot.salon_id === availabilityDraft.salonId)} selectedBarberId={selectedBarberId} setSelectedBarberId={setSelectedBarberId} selectedSlotTimes={selectedSlotTimes} toggleSuggestedTime={toggleSuggestedTime} onSubmitSlots={handleAddAvailability} isSavingSlots={isSavingAvailability} existingSlots={selectedBarberSlots} onRemoveSlot={deactivateAvailability} onToggleSlot={toggleAvailabilityCell} onDeactivateBarber={deactivateBarber} barberDraft={barberDraft} setBarberDraft={setBarberDraft} barberFile={barberFile} setBarberFile={setBarberFile} onSubmitBarber={handleAddBarber} isSavingBarber={isSavingBarber} />
+            {activeTab === 'legacy' && <div className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
+              <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
+                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Nouveau créneau</p>
+                <form className="mt-6 space-y-5" onSubmit={handleAddAvailability}>
+                  <DashboardField label="Salon"><select value={availabilityDraft.salonId} onChange={(event) => setAvailabilityDraft((current) => ({ ...current, salonId: event.target.value }))} className="dashboard-input">{Object.entries(salonNames).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></DashboardField>
+                  <DashboardField label="Date"><input required type="date" min={new Date().toISOString().slice(0, 10)} value={availabilityDraft.appointmentDate} onChange={(event) => setAvailabilityDraft((current) => ({ ...current, appointmentDate: event.target.value }))} className="dashboard-input" /></DashboardField>
+                  <DashboardField label="Heure"><input required type="time" value={availabilityDraft.appointmentTime} onChange={(event) => setAvailabilityDraft((current) => ({ ...current, appointmentTime: event.target.value }))} className="dashboard-input" /></DashboardField>
+                  <button type="submit" className="button-primary w-full" disabled={isSavingAvailability}><Plus size={16} />{isSavingAvailability ? 'Ajout…' : 'Ouvrir ce créneau'}</button>
+                </form>
+              </article>
+              <article className="overflow-hidden border border-zinc-800 bg-zinc-900/35">
+                <div className="border-b border-zinc-800 px-6 py-5"><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Créneaux configurés · {availabilitySlots.length}</p></div>
+                <div className="overflow-x-auto"><table className="min-w-[620px] w-full text-left text-sm"><thead className="border-b border-zinc-800 bg-zinc-900 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500"><tr><th className="px-5 py-4">Salon</th><th className="px-5 py-4">Date</th><th className="px-5 py-4">Heure</th><th className="px-5 py-4">Statut</th><th className="px-5 py-4">Action</th></tr></thead><tbody className="divide-y divide-zinc-800">{isLoading ? <tr><td colSpan="5" className="px-5 py-12 text-center text-zinc-500">Chargement…</td></tr> : availabilitySlots.length === 0 ? <tr><td colSpan="5" className="px-5 py-12 text-center text-zinc-500">Aucun créneau configuré.</td></tr> : availabilitySlots.map((slot) => <tr key={slot.id}><td className="px-5 py-4 text-zinc-200">{salonNames[slot.salon_id] ?? slot.salon_id}</td><td className="px-5 py-4 text-zinc-400">{formatDate(slot.appointment_date)}</td><td className="px-5 py-4 font-mono text-zinc-300">{slot.appointment_time.slice(0, 5)}</td><td className="px-5 py-4"><span className={slot.reserved_at ? 'text-amber-200' : slot.is_active ? 'text-emerald-400' : 'text-zinc-600'}>{slot.reserved_at ? 'Réservé' : slot.is_active ? 'Disponible' : 'Fermé'}</span></td><td className="px-5 py-4">{slot.is_active && !slot.reserved_at ? <button type="button" onClick={() => void deactivateAvailability(slot.id)} className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-amber-200">Retirer</button> : '—'}</td></tr>)}</tbody></table></div>
+              </article>
+            </div>}
+          </section>
+        ) : (
+          <section className="grid gap-6 xl:grid-cols-2">
+            <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Prestations</p>
+              <h2 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Ajouter une prestation</h2>
+              <form className="mt-7 space-y-5" onSubmit={handleAddService}>
+                <DashboardField label="Catégorie">
+                  <select value={newService.category} onChange={(event) => setNewService((service) => ({ ...service, category: event.target.value }))} className="dashboard-input">
+                    {categories.map((category) => <option key={category}>{category}</option>)}
+                  </select>
+                </DashboardField>
+                <DashboardField label="Nom de la prestation">
+                  <input required value={newService.name} onChange={(event) => setNewService((service) => ({ ...service, name: event.target.value }))} className="dashboard-input" placeholder="Ex. Coupe enfant" />
+                </DashboardField>
+                <DashboardField label="Prix affiché">
+                  <input required value={newService.price} onChange={(event) => setNewService((service) => ({ ...service, price: event.target.value }))} className="dashboard-input" placeholder="CHF 35.–" />
+                </DashboardField>
+                <button type="submit" className="button-primary w-full" disabled={isSavingService}><Plus size={16} />{isSavingService ? 'Ajout…' : 'Ajouter la prestation'}</button>
+              </form>
+            </article>
+
+            <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8 xl:col-span-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Galerie des services</p>
+              <h2 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Gérer les photos</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">Ajoutez une photo à chaque service. Elle apparaîtra sur la page Services du site client. JPG, PNG ou WebP · 5 Mo maximum.</p>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {services.map((service) => (
+                  <div key={service.id} className="overflow-hidden border border-zinc-800 bg-zinc-950/60">
+                    {service.image_url ? <img src={service.image_url} alt={service.image_title || service.name} className="aspect-[16/10] w-full object-cover" /> : <div className="flex aspect-[16/10] items-center justify-center bg-zinc-900 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-600">Aucune photo</div>}
+                    <div className="p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200">{service.category}</p>
+                      <p className="mt-1 font-semibold text-zinc-100">{service.name}</p>
+                      <p className="mt-1 text-sm text-zinc-500">{service.price}</p>
+                      <DashboardField label="Titre de la photo (facultatif)">
+                        <input value={serviceImageTitleDrafts[service.id] ?? service.image_title ?? ''} onChange={(event) => setServiceImageTitleDrafts((drafts) => ({ ...drafts, [service.id]: event.target.value }))} className="dashboard-input" placeholder="Ex. Coupe dégradée" />
+                      </DashboardField>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <label htmlFor={`service-image-${service.id}`} className={`inline-flex cursor-pointer items-center gap-2 border border-zinc-700 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-300 transition hover:border-amber-200 hover:text-amber-200 ${serviceImageUploadId === service.id ? 'pointer-events-none opacity-50' : ''}`}>
+                          <Upload size={14} />{serviceImageUploadId === service.id ? 'Téléversement…' : service.image_url ? 'Remplacer' : 'Ajouter une photo'}
+                        </label>
+                        <input id={`service-image-${service.id}`} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={serviceImageUploadId === service.id} onChange={(event) => void handleServiceImageUpload(event, service)} />
+                        {service.image_url && <button type="button" onClick={() => void handleRemoveServiceImage(service)} disabled={serviceImageUploadId === service.id} className="px-2 py-2 text-[10px] font-bold uppercase tracking-widest text-red-300 transition hover:text-red-100 disabled:opacity-50">Supprimer</button>}
+                        {service.image_url && <button type="button" onClick={() => void handleSaveServiceImageTitle(service)} disabled={serviceImageTitleSavingId === service.id || serviceImageUploadId === service.id} className="px-2 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-300 transition hover:text-amber-200 disabled:opacity-50">{serviceImageTitleSavingId === service.id ? 'Enregistrement…' : 'Enregistrer le titre'}</button>}
+                      </div>
+                      <button type="button" onClick={() => void handleDeleteService(service)} disabled={serviceDeleteId !== null || serviceImageUploadId === service.id || serviceImageTitleSavingId === service.id} className="mt-4 inline-flex items-center gap-2 border border-red-900/70 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-red-300 transition hover:border-red-500 hover:text-red-100 disabled:opacity-50"><Trash2 size={14} />{serviceDeleteId === service.id ? 'Suppression…' : 'Supprimer la prestation'}</button>
+                    </div>
+                  </div>
+                ))}
+                {services.length === 0 && <p className="border border-dashed border-zinc-700 p-5 text-sm text-zinc-500">Aucun service à gérer pour le moment.</p>}
+              </div>
+            </article>
+
+            <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Visuel du site</p>
+              <h2 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Photo hero section</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">Cette image apparaît en arrière-plan du hero. Vous pouvez la remplacer à tout moment.</p>
+              <form className="mt-7 space-y-5 border-t border-zinc-800 pt-7" onSubmit={handleImageUpload}>
+                {heroImageUrl && <img src={heroImageUrl} alt="Aperçu du hero" className="aspect-[16/8] w-full border border-zinc-700 object-cover" />}
+                <DashboardField label="Nouvelle photo - JPG, PNG ou WebP - 5 Mo max">
+                  <input id="hero-image-upload" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} className="block w-full border border-dashed border-zinc-700 bg-zinc-950 px-3 py-3 text-xs text-zinc-400 file:mr-4 file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-[10px] file:font-bold file:uppercase file:tracking-widest file:text-zinc-200" />
+                </DashboardField>
+                <button type="submit" className="button-primary w-full" disabled={!imageFile || isUploading}><Upload size={16} />{isUploading ? "Téléversement…" : "Téléverser et remplacer la photo hero"}</button>
+              </form>
+            </article>
+
+            <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Apparence du site client</p>
+              <h2 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Couleurs et logo</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">Choisissez séparément le fond du site client, la couleur du footer, les boutons et le style du logo.</p>
+              <div className="mt-8 space-y-8 border-t border-zinc-800 pt-7">
+                <section>
+                  <h3 className="font-display text-lg font-bold uppercase tracking-wide">Couleur du fond du site</h3>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {BODY_COLOR_OPTIONS.map((option) => <button key={option.value} type="button" aria-pressed={siteBodyColor === option.value} onClick={() => setSiteBodyColor(option.value)} className={`flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${siteBodyColor === option.value ? 'border-amber-200 text-amber-200' : 'border-zinc-700 text-zinc-300 hover:border-zinc-500'}`}><span className="h-5 w-5 rounded-full border border-black/20" style={{ backgroundColor: option.color }} />{option.label}</button>)}
+                  </div>
+                </section>
+                <section>
+                  <h3 className="font-display text-lg font-bold uppercase tracking-wide">Couleur du footer</h3>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {FOOTER_COLOR_OPTIONS.map((option) => <button key={option.value} type="button" aria-pressed={siteFooterColor === option.value} onClick={() => setSiteFooterColor(option.value)} className={`flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${siteFooterColor === option.value ? 'border-amber-200 text-amber-200' : 'border-zinc-700 text-zinc-300 hover:border-zinc-500'}`}><span className="h-5 w-5 rounded-full border border-white/20" style={{ backgroundColor: option.color }} />{option.label}</button>)}
+                  </div>
+                </section>
+                <section>
+                  <h3 className="font-display text-lg font-bold uppercase tracking-wide">Couleur des boutons</h3>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {BUTTON_COLOR_OPTIONS.map((option) => <button key={option.value} type="button" aria-pressed={siteButtonColor === option.value} onClick={() => setSiteButtonColor(option.value)} className={`flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${siteButtonColor === option.value ? 'border-amber-200 text-amber-200' : 'border-zinc-700 text-zinc-300 hover:border-zinc-500'}`}><span className="h-5 w-5 rounded-full border border-white/20" style={{ backgroundColor: option.color }} />{option.label}</button>)}
+                  </div>
+                </section>
+                <section>
+                  <h3 className="font-display text-lg font-bold uppercase tracking-wide">Style du logo</h3>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    {LOGO_STYLE_OPTIONS.map((option) => <button key={option.value} type="button" aria-pressed={siteLogoStyle === option.value} onClick={() => setSiteLogoStyle(option.value)} className={`flex min-h-24 flex-col items-center justify-center gap-2 border p-3 transition ${siteLogoStyle === option.value ? 'border-amber-200 bg-amber-200/5' : 'border-zinc-700 hover:border-zinc-500'}`}>
+                      <LogoStylePreview style={option.value} />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-300">{option.label}</span>
+                    </button>)}
+                  </div>
+                </section>
+                <button type="button" className="button-primary w-full" onClick={() => void handleSaveBranding()} disabled={isSavingBranding}><Check size={16} />{isSavingBranding ? 'Enregistrement…' : 'Enregistrer le design'}</button>
+              </div>
+            </article>
+          </section>
+        )}
+
+        <div className="mt-8 flex justify-end">
+          <button type="button" className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition hover:text-amber-200" onClick={() => void loadDashboard({ clearFeedback: true })} disabled={isLoading}>
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Actualiser les données
+          </button>
+        </div>
+      </div>
+    </main>
+  )
+}
+
+function LogoStylePreview({ style }) {
+  if (style === 'classic') return <img src="/alep-salon-logo.png" alt="" className="h-10 max-w-full object-contain" />
+  if (style === 'wordmark') return <span className="flex flex-col items-center font-display leading-none"><span className="text-xl font-black tracking-[0.2em] text-white">ALEP</span><span className="mt-1 border border-amber-200 px-2 py-0.5 text-[9px] font-medium tracking-[0.3em] text-amber-200">SALON</span></span>
+  return <span className="flex items-center gap-2"><span className="flex h-9 w-9 items-center justify-center rounded-full border border-amber-200 text-amber-200"><Scissors size={17} /></span><span className="font-display text-sm font-black uppercase tracking-[0.14em] text-white">Alep<br />Salon</span></span>
+}
+
+function DashboardTab({ active, onClick, icon, children }) {
+  return <button type="button" onClick={onClick} className={`flex flex-1 items-center justify-center gap-2 border px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] transition sm:flex-none ${active ? 'border-amber-200 bg-amber-200 text-zinc-950' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-100'}`}>{icon}{children}</button>
+}
+
+function DashboardField({ label, children }) {
+  return <label className="block"><span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{label}</span>{children}</label>
+}
+
+function AvailabilityConfiguration({ availabilityDraft, setAvailabilityDraft, barbers, allSlots, selectedBarberId, setSelectedBarberId, selectedSlotTimes, toggleSuggestedTime, onSubmitSlots, isSavingSlots, existingSlots, onRemoveSlot, onToggleSlot, onDeactivateBarber, barberDraft, setBarberDraft, barberFile, setBarberFile, onSubmitBarber, isSavingBarber }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const updateAvailabilitySalon = (salonId) => {
+    setAvailabilityDraft((draft) => ({ ...draft, salonId }))
+    setSelectedBarberId('')
+  }
+
+  return <><AvailabilityGrid availabilityDraft={availabilityDraft} setAvailabilityDraft={setAvailabilityDraft} barbers={barbers} allSlots={allSlots} onToggleSlot={onToggleSlot} onDeactivateBarber={onDeactivateBarber} barberDraft={barberDraft} setBarberDraft={setBarberDraft} barberFile={barberFile} setBarberFile={setBarberFile} onSubmitBarber={onSubmitBarber} isSavingBarber={isSavingBarber} today={today} /><div className="hidden">
+    <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
+      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">L’équipe</p>
+      <h3 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Ajouter un barbier</h3>
+      <p className="mt-3 text-sm leading-6 text-zinc-500">La photo et le nom seront affichés au client avant le choix du créneau.</p>
+      <form className="mt-7 space-y-5" onSubmit={onSubmitBarber}>
+        <DashboardField label="Salon"><select value={barberDraft.salonId} onChange={(event) => setBarberDraft((draft) => ({ ...draft, salonId: event.target.value }))} className="dashboard-input">{Object.entries(salonNames).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></DashboardField>
+        <DashboardField label="Nom du barbier"><input required value={barberDraft.name} onChange={(event) => setBarberDraft((draft) => ({ ...draft, name: event.target.value }))} className="dashboard-input" placeholder="Ex. Moha" /></DashboardField>
+        <DashboardField label="Photo · JPG, PNG ou WebP · 5 Mo max"><input id="barber-image-upload" required type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setBarberFile(event.target.files?.[0] ?? null)} className="block w-full border border-dashed border-zinc-700 bg-zinc-950 px-3 py-3 text-xs text-zinc-400 file:mr-4 file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-[10px] file:font-bold file:uppercase file:tracking-widest file:text-zinc-200" /></DashboardField>
+        <button type="submit" className="button-primary w-full" disabled={!barberFile || isSavingBarber}><Upload size={16} />{isSavingBarber ? 'Ajout…' : 'Ajouter le barbier'}</button>
+      </form>
+    </article>
+    <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
+      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Planning</p>
+      <h3 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Configurer les créneaux</h3>
+      <div className="mt-7 space-y-6">
+        <DashboardField label="Salon"><select value={availabilityDraft.salonId} onChange={(event) => updateAvailabilitySalon(event.target.value)} className="dashboard-input">{Object.entries(salonNames).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></DashboardField>
+        <section><span className="mb-3 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Choisir le barbier</span>{barbers.length === 0 ? <p className="border border-dashed border-zinc-700 px-4 py-4 text-sm text-zinc-500">Ajoutez d’abord un barbier pour ce salon.</p> : <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{barbers.map((barber) => <button type="button" key={barber.id} onClick={() => setSelectedBarberId(barber.id)} className={`overflow-hidden border text-left transition ${selectedBarberId === barber.id ? 'border-amber-200 bg-amber-200/10' : 'border-zinc-700 hover:border-zinc-500'}`}><img src={barber.image_url} alt={barber.name} className="aspect-[1.1] w-full object-cover" /><span className="block px-3 py-3 text-sm font-bold text-zinc-100">{barber.name}</span></button>)}</div>}</section>
+        <div className="flex justify-end"><button type="button" disabled={!selectedBarberId} onClick={() => onDeactivateBarber(selectedBarberId)} className="border border-red-500/40 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-red-300 transition hover:border-red-300 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40">Retirer le barbier sélectionné</button></div>
+        <DashboardField label="Date"><input required type="date" min={today} value={availabilityDraft.appointmentDate} onChange={(event) => setAvailabilityDraft((draft) => ({ ...draft, appointmentDate: event.target.value }))} className="dashboard-input" /></DashboardField>
+        <form onSubmit={onSubmitSlots}><section><span className="mb-3 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Heures disponibles</span><div className="grid grid-cols-3 gap-2 sm:grid-cols-5">{suggestedTimes.map((time) => <button type="button" key={time} onClick={() => toggleSuggestedTime(time)} className={`border px-3 py-3 font-mono text-sm transition ${selectedSlotTimes.includes(time) ? 'border-amber-200 bg-amber-200 text-zinc-950' : 'border-zinc-700 bg-zinc-950 text-zinc-300 hover:border-amber-200 hover:text-amber-200'}`}>{time}</button>)}</div></section><button type="submit" className="button-primary mt-6 w-full" disabled={!selectedBarberId || selectedSlotTimes.length === 0 || isSavingSlots}><Plus size={16} />{isSavingSlots ? 'Ajout…' : `Ouvrir ${selectedSlotTimes.length || ''} créneau${selectedSlotTimes.length > 1 ? 'x' : ''}`}</button></form>
+        <section className="border-t border-zinc-800 pt-6"><span className="mb-3 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Créneaux de cette date</span>{!selectedBarberId ? <p className="text-sm text-zinc-600">Choisissez un barbier.</p> : existingSlots.length === 0 ? <p className="text-sm text-zinc-600">Aucun créneau configuré.</p> : <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">{existingSlots.map((slot) => <button key={slot.id} type="button" disabled={Boolean(slot.reserved_at)} onClick={() => !slot.reserved_at && onRemoveSlot(slot.id)} className={`border px-3 py-3 font-mono text-sm ${slot.reserved_at ? 'cursor-not-allowed border-amber-200/40 bg-amber-200/10 text-amber-200' : slot.is_active ? 'border-emerald-400/50 text-emerald-400 hover:border-amber-200 hover:text-amber-200' : 'border-zinc-800 text-zinc-600'}`}>{slot.appointment_time.slice(0, 5)}</button>)}</div>}<p className="mt-3 text-[10px] text-zinc-600">Vert : disponible. Jaune : réservé. Cliquez sur un créneau vert pour le retirer.</p></section>
+        <section className="border-t border-zinc-800 pt-6">
+          <span className="mb-3 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Tableau des disponibilités par barbier</span>
+          <p className="mb-4 text-sm leading-6 text-zinc-500">Chaque colonne est un barbier. Un même horaire peut être ouvert et réservé pour chaque barbier : à 10:00, trois barbiers peuvent donc recevoir trois clients.</p>
+          {barbers.length === 0 ? <p className="text-sm text-zinc-600">Ajoutez des barbiers pour afficher le planning.</p> : <div className="overflow-x-auto border border-zinc-800"><table className="min-w-[680px] w-full text-left text-sm"><thead className="border-b border-zinc-800 bg-zinc-900 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500"><tr><th className="px-4 py-3">Heure</th>{barbers.map((barber) => <th key={barber.id} className="min-w-36 px-4 py-3">{barber.name}</th>)}</tr></thead><tbody className="divide-y divide-zinc-800">{suggestedTimes.map((time) => <tr key={time}><td className="px-4 py-3 font-mono text-zinc-300">{time}</td>{barbers.map((barber) => { const slot = allSlots.find((item) => item.barber_id === barber.id && item.appointment_time.slice(0, 5) === time); return <td key={barber.id} className="px-4 py-3"><button type="button" onClick={() => setSelectedBarberId(barber.id)} className={`w-full border px-2 py-2 text-[10px] font-bold uppercase tracking-wide ${slot?.reserved_at ? 'border-amber-200/40 bg-amber-200/10 text-amber-200' : slot?.is_active ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400' : 'border-zinc-800 text-zinc-600 hover:border-zinc-600'}`}>{slot?.reserved_at ? 'Réservé' : slot?.is_active ? 'Ouvert' : '—'}</button></td>})}</tr>)}</tbody></table></div>}
+          <p className="mt-3 text-[10px] text-zinc-600">Vert : disponible. Jaune : réservé. Cliquez sur une case pour sélectionner ce barbier et modifier ses créneaux.</p>
+        </section>
+      </div>
+    </article>
+  </div></>
+}
+
+function AvailabilityGrid({ availabilityDraft, setAvailabilityDraft, barbers, allSlots, onToggleSlot, onDeactivateBarber, barberDraft, setBarberDraft, barberFile, setBarberFile, onSubmitBarber, isSavingBarber, today }) {
+  return <><BarberAvailabilityCards availabilityDraft={availabilityDraft} setAvailabilityDraft={setAvailabilityDraft} barbers={barbers} allSlots={allSlots} onToggleSlot={onToggleSlot} onDeactivateBarber={onDeactivateBarber} barberDraft={barberDraft} setBarberDraft={setBarberDraft} barberFile={barberFile} setBarberFile={setBarberFile} onSubmitBarber={onSubmitBarber} isSavingBarber={isSavingBarber} today={today} /><div className="hidden space-y-6">
+    <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
+      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">L'équipe</p>
+      <h3 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Ajouter un barbier</h3>
+      <form className="mt-6 grid gap-4 md:grid-cols-3" onSubmit={onSubmitBarber}>
+        <DashboardField label="Nom"><input required value={barberDraft.name} onChange={(event) => setBarberDraft((draft) => ({ ...draft, name: event.target.value }))} className="dashboard-input" placeholder="Ex. Moha" /></DashboardField>
+        <DashboardField label="Photo"><input id="barber-image-upload" required type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setBarberFile(event.target.files?.[0] ?? null)} className="block w-full border border-dashed border-zinc-700 bg-zinc-950 px-3 py-3 text-xs text-zinc-400" /></DashboardField>
+        <button type="submit" className="button-primary self-end" disabled={!barberFile || isSavingBarber}><Upload size={16} />{isSavingBarber ? 'Ajout…' : 'Ajouter'}</button>
+      </form>
+    </article>
+
+    <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Disponibilités</p><h3 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Planning par barbier</h3></div><div className="grid grid-cols-2 gap-3"><DashboardField label="Salon"><select value={availabilityDraft.salonId} onChange={(event) => setAvailabilityDraft((draft) => ({ ...draft, salonId: event.target.value }))} className="dashboard-input">{Object.entries(salonNames).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></DashboardField><DashboardField label="Date"><input type="date" min={today} value={availabilityDraft.appointmentDate} onChange={(event) => setAvailabilityDraft((draft) => ({ ...draft, appointmentDate: event.target.value }))} className="dashboard-input" /></DashboardField></div></div>
+      <section className="mt-7"><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Barbiers actifs</p>{barbers.length === 0 ? <p className="border border-dashed border-zinc-700 px-4 py-4 text-sm text-zinc-500">Ajoutez un barbier pour commencer.</p> : <div className="flex gap-3 overflow-x-auto pb-2">{barbers.map((barber) => <img key={barber.id} src={barber.image_url} alt={barber.name} title={barber.name} className="h-20 w-20 shrink-0 border border-zinc-700 object-cover" />)}</div>}</section>
+      <section className="mt-7 overflow-x-auto border border-zinc-800"><table className="min-w-[1250px] w-full text-center text-sm"><thead className="border-b border-zinc-800 bg-zinc-900 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500"><tr><th className="sticky left-0 z-10 min-w-40 bg-zinc-900 px-4 py-4 text-left">Barbier</th>{suggestedTimes.map((time) => <th key={time} className="min-w-20 px-2 py-4 font-mono">{time}</th>)}</tr></thead><tbody className="divide-y divide-zinc-800">{barbers.map((barber) => <tr key={barber.id}><th className="sticky left-0 z-10 bg-zinc-950 px-4 py-3 text-left font-semibold text-zinc-200"><div className="flex items-center gap-3"><img src={barber.image_url} alt="" className="h-9 w-9 object-cover" /><span>{barber.name}</span><button type="button" onClick={() => onDeactivateBarber(barber.id)} className="ml-auto text-[10px] font-bold uppercase text-red-300 hover:text-red-100">Retirer</button></div></th>{suggestedTimes.map((time) => { const slot = allSlots.find((item) => item.barber_id === barber.id && item.appointment_time.slice(0, 5) === time); const state = slot?.reserved_at ? 'reserved' : slot?.is_active ? 'open' : 'closed'; return <td key={time} className="px-2 py-3"><button type="button" disabled={state === 'reserved'} onClick={() => onToggleSlot(barber.id, time, slot)} aria-label={`${barber.name}, ${time}`} className={`h-10 w-full border text-[10px] font-bold uppercase transition ${state === 'reserved' ? 'cursor-not-allowed border-amber-200/40 bg-amber-200/10 text-amber-200' : state === 'open' ? 'border-emerald-400/60 bg-emerald-400/15 text-emerald-300 hover:border-emerald-300' : 'border-zinc-800 bg-zinc-950 text-zinc-600 hover:border-emerald-400/60 hover:text-emerald-300'}`}>{state === 'reserved' ? 'Réservé' : state === 'open' ? 'Disponible' : '—'}</button></td>})}</tr>)}</tbody></table></section>
+      <p className="mt-4 text-xs text-zinc-500">Cliquez sur une case vide : elle devient verte et disponible. Cliquez sur une case verte : elle est fermée. Une case jaune est déjà réservée. Chaque barbier possède ses propres créneaux, donc trois barbiers peuvent recevoir trois clients à la même heure.</p>
+    </article>
+  </div></>
+}
+
+function BarberAvailabilityCards({ availabilityDraft, setAvailabilityDraft, barbers, allSlots, onToggleSlot, onDeactivateBarber, barberDraft, setBarberDraft, barberFile, setBarberFile, onSubmitBarber, isSavingBarber, today }) {
+  const [datesByBarber, setDatesByBarber] = useState({})
+  const defaultDate = availabilityDraft.appointmentDate || today
+
+  return <div className="space-y-6">
+    <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
+      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">L'équipe</p>
+      <h3 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Ajouter un barbier</h3>
+      <form className="mt-6 grid gap-4 md:grid-cols-3" onSubmit={onSubmitBarber}>
+        
+        <DashboardField label="Nom"><input required value={barberDraft.name} onChange={(event) => setBarberDraft((draft) => ({ ...draft, name: event.target.value }))} className="dashboard-input" placeholder="Ex. Moha" /></DashboardField>
+        <DashboardField label="Photo"><input id="barber-image-upload" required type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setBarberFile(event.target.files?.[0] ?? null)} className="block w-full border border-dashed border-zinc-700 bg-zinc-950 px-3 py-3 text-xs text-zinc-400" /></DashboardField>
+        <button type="submit" className="button-primary self-end" disabled={!barberFile || isSavingBarber}><Upload size={16} />{isSavingBarber ? 'Ajout…' : 'Ajouter'}</button>
+      </form>
+    </article>
+
+    <section className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Disponibilités</p><h3 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Créneaux par barbier</h3></div></div>
+      {barbers.length === 0 ? <p className="mt-6 border border-dashed border-zinc-700 px-4 py-5 text-sm text-zinc-500">Ajoutez un barbier pour commencer.</p> : <div className="mt-7 grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 34rem), 1fr))' }}>{barbers.map((barber) => <BarberAvailabilityCard key={barber.id} barber={barber} slots={allSlots.filter((slot) => slot.barber_id === barber.id)} selectedDate={datesByBarber[barber.id] || defaultDate} onDateChange={(date) => { setDatesByBarber((dates) => ({ ...dates, [barber.id]: date })); setAvailabilityDraft((draft) => ({ ...draft, appointmentDate: date })) }} onToggleSlot={onToggleSlot} onDeactivate={() => onDeactivateBarber(barber.id)} today={today} />)}</div>}
+    </section>
+  </div>
+}
+
+function BarberAvailabilityCard({ barber, slots, selectedDate, onDateChange, onToggleSlot, onDeactivate, today }) {
+  const [monthCursor, setMonthCursor] = useState(() => new Date(`${selectedDate}T12:00:00`))
+  const monthStart = new Date(monthCursor.getFullYear(), monthCursor.getMonth(), 1)
+  const daysInMonth = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 0).getDate()
+  const firstWeekday = (monthStart.getDay() + 6) % 7
+  const label = new Intl.DateTimeFormat('fr-CH', { month: 'long', year: 'numeric' }).format(monthStart)
+  const calendarDays = Array.from({ length: firstWeekday + daysInMonth }, (_, index) => index < firstWeekday ? null : index - firstWeekday + 1)
+  const toDate = (day) => `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const dayHasSlot = (date) => slots.some((slot) => slot.appointment_date === date && slot.is_active)
+  const timeSlots = slots.filter((slot) => slot.appointment_date === selectedDate)
+
+  return <article className="border border-zinc-800 bg-zinc-950/50 p-4 sm:p-5"><header className="flex items-center gap-3 border-b border-zinc-800 pb-4"><img src={barber.image_url} alt={barber.name} className="h-14 w-14 border border-zinc-700 object-cover" /><h4 className="font-display text-xl font-bold uppercase tracking-tight text-zinc-100">{barber.name}</h4><button type="button" onClick={onDeactivate} className="ml-auto text-[10px] font-bold uppercase tracking-wide text-red-300 hover:text-red-100">Retirer</button></header><div className="mt-5 grid gap-5 md:grid-cols-2"><section><div className="mb-3 flex items-center justify-between"><button type="button" onClick={() => setMonthCursor((date) => new Date(date.getFullYear(), date.getMonth() - 1, 1))} className="px-2 text-zinc-400 hover:text-amber-200" aria-label="Mois précédent">‹</button><p className="text-sm font-bold capitalize text-zinc-200">{label}</p><button type="button" onClick={() => setMonthCursor((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1))} className="px-2 text-zinc-400 hover:text-amber-200" aria-label="Mois suivant">›</button></div><div className="grid grid-cols-7 gap-1 text-center text-[10px] text-zinc-600">{['L','M','M','J','V','S','D'].map((day, index) => <span key={`${day}-${index}`} className="py-1">{day}</span>)}{calendarDays.map((day, index) => { if (!day) return <span key={`blank-${index}`} />; const date = toDate(day); const isPast = date < today; return <button key={date} type="button" disabled={isPast} onClick={() => onDateChange(date)} className={`relative h-8 rounded-sm text-xs transition ${selectedDate === date ? 'bg-amber-200 font-bold text-zinc-950' : isPast ? 'cursor-not-allowed text-zinc-800' : 'text-zinc-300 hover:bg-zinc-800'} ${dayHasSlot(date) && selectedDate !== date ? 'ring-1 ring-emerald-400/60' : ''}`}>{day}</button>})}</div></section><section><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Horaires · {selectedDate}</p><div className="grid grid-cols-3 gap-2">{suggestedTimes.map((time) => { const slot = timeSlots.find((item) => item.appointment_time.slice(0, 5) === time); const state = slot?.reserved_at ? 'reserved' : slot?.is_active ? 'open' : 'closed'; return <button type="button" key={time} disabled={state === 'reserved'} onClick={() => onToggleSlot(barber.id, selectedDate, time, slot)} className={`border px-2 py-3 font-mono text-sm transition ${state === 'reserved' ? 'cursor-not-allowed border-amber-200/40 bg-amber-200/10 text-amber-200' : state === 'open' ? 'border-emerald-400/60 bg-emerald-400/15 text-emerald-300' : 'border-zinc-800 text-zinc-500 hover:border-emerald-400/60 hover:text-emerald-300'}`}>{time}</button>})}</div></section></div></article>
+}
+
+function ReservationGroup({ group, pricesByService }) {
+  return (
+    <section className="overflow-hidden border border-zinc-800 bg-zinc-900/35">
+      <header className="flex items-center gap-3 border-b border-zinc-800 bg-zinc-900 px-5 py-4">
+        {group.imageUrl ? <img src={group.imageUrl} alt="" className="h-10 w-10 rounded-full border border-zinc-700 object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 text-zinc-500"><Scissors size={16} /></span>}
+        <h3 className="font-display text-xl font-bold uppercase text-zinc-100">{group.name}</h3>
+        <span className="ml-auto text-xs text-zinc-500">{group.reservations.length} rendez-vous</span>
+      </header>
+      <div className="overflow-x-auto">
+        <table className="min-w-[780px] w-full text-left text-sm">
+          <thead className="border-b border-zinc-800 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500">
+            <tr><th className="px-5 py-4">Client</th><th className="px-5 py-4">Téléphone</th><th className="px-5 py-4">Prestation</th><th className="px-5 py-4">Prix</th><th className="px-5 py-4">Date</th><th className="px-5 py-4">Heure</th><th className="px-5 py-4">Statut</th></tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-800">
+            {group.reservations.map((reservation) => (
+              <tr key={reservation.id} className="transition-colors hover:bg-zinc-900/80">
+                <td className="px-5 py-4 font-semibold text-zinc-200">{reservation.client_name}</td>
+                <td className="px-5 py-4 text-zinc-400">{reservation.client_phone}</td>
+                <td className="px-5 py-4 text-zinc-300">{reservation.service_name}</td>
+                <td className="px-5 py-4"><span className="price-badge">{pricesByService.get(reservation.service_name) ?? '—'}</span></td>
+                <td className="px-5 py-4 text-zinc-300">{formatDate(reservation.appointment_date)}</td>
+                <td className="px-5 py-4 font-mono text-zinc-300">{reservation.appointment_time?.slice(0, 5) ?? '—'}</td>
+                <td className="px-5 py-4"><span className={reservation.status === 'confirmed' ? 'text-emerald-400' : reservation.status === 'cancelled' ? 'text-zinc-500' : 'text-amber-200'}>{reservation.status === 'confirmed' ? 'Confirmé' : reservation.status === 'cancelled' ? 'Annulé' : 'En attente'}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
