@@ -3,6 +3,16 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault()
+  window.alepInstallPrompt = event
+  window.dispatchEvent(new Event('alepinstallprompt'))
+})
+
+window.addEventListener('appinstalled', () => {
+  window.alepInstallPrompt = null
+})
+
 class AppErrorBoundary extends Component {
   state = { error: null }
 

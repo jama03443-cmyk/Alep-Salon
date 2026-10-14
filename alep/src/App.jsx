@@ -187,6 +187,7 @@ function PublicSite() {
   const [servicesMenuOpen, setServicesMenuOpen] = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installDialogOpen, setInstallDialogOpen] = useState(false)
+  const [installHelpMessage, setInstallHelpMessage] = useState('')
   const [managedSalons, setManagedSalons] = useState([])
   const [managedHeroImageUrl, setManagedHeroImageUrl] = useState('')
   const [managedBranding, setManagedBranding] = useState({
@@ -356,24 +357,29 @@ function PublicSite() {
 
   useEffect(() => {
     const isInstalled = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true
-    const handleInstallPrompt = (event) => {
-      event.preventDefault()
-      setInstallPrompt(event)
+    const handleInstallPrompt = () => {
+      const prompt = window.alepInstallPrompt
+      if (!prompt) return
+      setInstallPrompt(prompt)
+      setInstallHelpMessage('')
     }
     const handleAppInstalled = () => {
+      window.alepInstallPrompt = null
       setInstallPrompt(null)
       setInstallDialogOpen(false)
+      setInstallHelpMessage('')
     }
     const shouldShowInstallPopup = !isInstalled && !new URLSearchParams(window.location.search).has('phonePreview')
     const installPopupTimer = shouldShowInstallPopup
       ? window.setTimeout(() => setInstallDialogOpen(true), 5000)
       : null
 
-    window.addEventListener('beforeinstallprompt', handleInstallPrompt)
+    window.addEventListener('alepinstallprompt', handleInstallPrompt)
+    handleInstallPrompt()
     window.addEventListener('appinstalled', handleAppInstalled)
     return () => {
       if (installPopupTimer) window.clearTimeout(installPopupTimer)
-      window.removeEventListener('beforeinstallprompt', handleInstallPrompt)
+      window.removeEventListener('alepinstallprompt', handleInstallPrompt)
       window.removeEventListener('appinstalled', handleAppInstalled)
     }
   }, [])
@@ -524,17 +530,26 @@ function PublicSite() {
   const handleInstall = async () => {
     if (!installPrompt) {
       const isAppleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent)
-      window.alert(language === 'FR'
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      const isAndroid = /Android/i.test(navigator.userAgent)
+      const helpMessage = language === 'FR'
         ? isAppleMobile
-          ? 'Sur iPhone et iPad, Safari ne permet pas de lancer l’installation directement. Utilisez Partager, puis « Sur l’écran d’accueil ».'
-          : 'L’installation directe n’est pas disponible dans ce navigateur. Ouvrez son menu et choisissez « Installer Alep Salon ».'
+          ? 'Sur iPhone ou iPad : ouvrez ce site dans Safari, touchez Partager, puis « Sur l’écran d’accueil ». iOS ne permet pas l’installation directe par ce bouton.'
+          : isAndroid
+            ? 'Sur Android : ouvrez ce site dans Chrome, touchez ⋮, puis « Installer l’application » ou « Ajouter à l’écran d’accueil ». '
+            : 'Sur ordinateur : dans Chrome ou Edge, cliquez sur l’icône Installer dans la barre d’adresse, ou ouvrez ⋮ puis « Installer Alep Salon ». '
         : isAppleMobile
-          ? 'Auf iPhone und iPad lässt Safari keine direkte Installation zu. Tippe auf „Teilen“ und dann auf „Zum Home-Bildschirm“.'
-          : 'Die direkte Installation ist in diesem Browser nicht verfügbar. Öffne das Menü und wähle „Alep Salon installieren“.')
+          ? 'Auf iPhone oder iPad: Öffne diese Seite in Safari, tippe auf „Teilen“ und dann auf „Zum Home-Bildschirm“. iOS unterstützt keine direkte Installation über diese Schaltfläche.'
+          : isAndroid
+            ? 'Auf Android: Öffne diese Seite in Chrome, tippe auf ⋮ und dann auf „App installieren“ oder „Zum Startbildschirm hinzufügen“. '
+            : 'Am Computer: Klicke in Chrome oder Edge auf das Installationssymbol in der Adressleiste oder öffne ⋮ und wähle „Alep Salon installieren“. '
+      setInstallHelpMessage(helpMessage)
+      setInstallDialogOpen(true)
       return
     }
 
     try {
+      setInstallHelpMessage('')
       await installPrompt.prompt()
       const choice = await installPrompt.userChoice
       if (choice?.outcome === 'accepted') setInstallDialogOpen(false)
@@ -785,6 +800,7 @@ function PublicSite() {
               <button type="button" className="button-primary min-h-9 w-full justify-center px-3 py-2 text-xs" onClick={() => void handleInstall()}>
                 <Download size={17} />{t.install}
               </button>
+              {installHelpMessage && <p role="status" className="mt-3 text-xs leading-5 text-zinc-300">{installHelpMessage}</p>}
             </div>
           </section>
         </div>
