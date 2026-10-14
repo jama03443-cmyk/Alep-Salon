@@ -93,6 +93,7 @@ export default function AdminDashboard() {
   const [isScanning, setIsScanning] = useState(false)
   const [scannerMessage, setScannerMessage] = useState('')
   const videoRef = useRef(null)
+  const loyaltyLiveChannelRef = useRef(null)
   const labels = language === 'DE'
     ? { admin: 'Administration', logout: 'Abmelden', private: 'Interne Verwaltung', dashboard: 'Dashboard', reservations: 'Buchungen', loyalty: 'Treueprogramm', availability: 'Verfügbarkeiten', management: 'Verwaltung', reservationsTitle: 'Kundenbuchungen', loyaltyTitle: 'Treuekarten', availabilityTitle: 'Verfügbarkeiten', clearReservations: 'Buchungen leeren', clearReservationsConfirm: 'Alle Buchungen löschen und reservierte Zeitfenster wieder freigeben? Treuekarten und Kundenprofile bleiben unverändert.', clearReservationsDone: 'Alle Buchungen wurden gelöscht; reservierte Zeitfenster sind wieder frei.' }
     : { admin: 'Espace administration', logout: 'Déconnexion', private: 'Gestion privée', dashboard: 'Tableau de bord', reservations: 'Réservations', loyalty: 'Fidélité', availability: 'Disponibilités', management: 'Gestion', reservationsTitle: 'Réservations clients', loyaltyTitle: 'Cartes de fidélité', availabilityTitle: 'Disponibilités', clearReservations: 'Vider les réservations', clearReservationsConfirm: 'Supprimer toutes les réservations et libérer les créneaux réservés ? Les cartes de fidélité et les profils clients resteront inchangés.', clearReservationsDone: 'Toutes les réservations ont été supprimées et les créneaux réservés ont été libérés.' }
@@ -173,12 +174,14 @@ export default function AdminDashboard() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'loyalty_cards' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'loyalty_point_events' }, refresh)
       .subscribe()
+    loyaltyLiveChannelRef.current = channel
     const timer = window.setInterval(refresh, 4000)
     const onFocus = () => refresh()
     window.addEventListener('focus', onFocus)
     return () => {
       window.clearInterval(timer)
       window.removeEventListener('focus', onFocus)
+      loyaltyLiveChannelRef.current = null
       void supabase.removeChannel(channel)
     }
   }, [refreshLoyaltyCards])
@@ -291,6 +294,11 @@ export default function AdminDashboard() {
     else {
       setFeedback({ type: 'success', text: 'Visite validée : 1 point a été ajouté.' })
       await refreshLoyaltyCards()
+      await loyaltyLiveChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'loyalty-points-updated',
+        payload: { cardId },
+      })
     }
   }
 
@@ -304,6 +312,11 @@ export default function AdminDashboard() {
     else {
       setFeedback({ type: 'success', text: `${delta > 0 ? '+' : ''}${delta} point appliqué.` })
       await refreshLoyaltyCards()
+      await loyaltyLiveChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'loyalty-points-updated',
+        payload: { cardId },
+      })
     }
   }
 

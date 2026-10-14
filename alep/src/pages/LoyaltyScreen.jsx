@@ -108,17 +108,26 @@ export default function LoyaltyScreen() {
     if (!session || !supabase || !card?.id) return undefined
     let active = true
     const refresh = () => { if (active) void refreshLoyaltyData() }
-    const channel = supabase.channel(`loyalty-client-${card.id}`)
+    const channel = supabase.channel('admin-loyalty-live')
+      .on('broadcast', { event: 'loyalty-points-updated' }, ({ payload }) => {
+        if (payload?.cardId === card.id) refresh()
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'loyalty_cards', filter: `id=eq.${card.id}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'loyalty_point_events', filter: `loyalty_card_id=eq.${card.id}` }, refresh)
       .subscribe()
     const timer = window.setInterval(refresh, 4000)
     const onFocus = () => refresh()
+    const onVisibilityChange = () => { if (!document.hidden) refresh() }
+    const onPageShow = () => refresh()
     window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pageshow', onPageShow)
     return () => {
       active = false
       window.clearInterval(timer)
       window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('pageshow', onPageShow)
       void supabase.removeChannel(channel)
     }
   }, [session, card?.id, refreshLoyaltyData])
