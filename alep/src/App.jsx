@@ -14,7 +14,7 @@ import {
   WifiOff,
   X,
 } from 'lucide-react'
-import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { useAuth } from './auth/useAuth'
 import { isSupabaseConfigured, supabase } from './supabaseClient'
@@ -1084,9 +1084,31 @@ function RouteLoading() {
   return <main className="flex min-h-screen items-center justify-center bg-zinc-950 text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-500">Vérification de la session…</main>
 }
 
+function PwaManifestSwitcher() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    const manifest = pathname.startsWith('/admin-')
+      ? '/manifest-admin.webmanifest'
+      : '/manifest-alep-v2.webmanifest'
+    let link = document.querySelector('link[rel="manifest"]')
+    if (!link) {
+      link = document.createElement('link')
+      link.rel = 'manifest'
+      document.head.appendChild(link)
+    }
+    if (new URL(link.href || '/', window.location.origin).pathname !== manifest) {
+      link.href = manifest
+    }
+  }, [pathname])
+
+  return null
+}
+
 function App() {
   return (
     <BrowserRouter>
+      <PwaManifestSwitcher />
       <AuthProvider>
         <Routes>
           <Route path="/" element={<PublicSite />} />
