@@ -8,6 +8,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      manifestFilename: 'manifest-alep-v2.webmanifest',
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'service-worker.js',
@@ -17,6 +18,9 @@ export default defineConfig({
         name: 'Alep Salon Suisse',
         short_name: 'Alep Salon',
         description: 'Réservez votre coupe chez Alep Salon à Bienne.',
+        id: '/',
+        start_url: '/',
+        scope: '/',
         theme_color: '#09090b',
         background_color: '#09090b',
         display: 'standalone',
