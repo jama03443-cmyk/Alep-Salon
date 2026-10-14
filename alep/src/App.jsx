@@ -1088,9 +1088,19 @@ function PwaManifestSwitcher() {
   const { pathname } = useLocation()
 
   useEffect(() => {
-    const manifest = pathname.startsWith('/admin-')
+    const isAdminApp = pathname.startsWith('/admin-')
+    const manifest = isAdminApp
       ? '/manifest-admin.webmanifest'
       : '/manifest-alep-v2.webmanifest'
+    const title = isAdminApp ? 'Alep Admin — Administration' : 'Alep Salon — Suisse'
+    document.title = title
+    let appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]')
+    if (!appleTitle) {
+      appleTitle = document.createElement('meta')
+      appleTitle.name = 'apple-mobile-web-app-title'
+      document.head.appendChild(appleTitle)
+    }
+    appleTitle.content = isAdminApp ? 'Alep Admin' : 'Alep Salon'
     let link = document.querySelector('link[rel="manifest"]')
     if (!link) {
       link = document.createElement('link')
