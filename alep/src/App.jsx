@@ -223,6 +223,7 @@ function PublicSite() {
       .fromTo('.site-intro-welcome',
         { y: 48, opacity: 0 },
         { y: 0, opacity: 1, duration: 0.65, ease: 'power3.out' },
+        '+=0.35',
       )
       .to('.site-intro-logo', { opacity: 1, duration: 0.45 })
       .to('.site-intro', { yPercent: -100, duration: 0.8, ease: 'power4.inOut' }, '+=0.2')
