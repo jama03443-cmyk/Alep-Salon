@@ -23,23 +23,28 @@ Le dépôt contient le site dans le dossier `alep`. Lors de l’import dans Verc
 
 Après le premier déploiement, ajoutez le domaine Vercel de production aux URL de redirection autorisées dans **Supabase → Authentication → URL Configuration**. La connexion Google fidélité revient sur `/fidelite`.
 
-## Initialiser Supabase
+## Configurer Supabase
 
-Exécutez les migrations dans cet ordre depuis le SQL Editor du projet Supabase :
+Pour une nouvelle base Supabase, exécutez chaque script une fois dans le SQL Editor, dans cet ordre :
 
 1. `schema.sql`
 2. `loyalty-migration.sql`
-3. `loyalty-program-settings-migration.sql`
-4. `loyalty-steps-migration.sql`
-5. `loyalty-reward-auto-reset-migration.sql`
-6. `availability-migration.sql`
-7. `barbers-availability-migration.sql`
-8. `reservation-status-migration.sql`
-9. `instant-booking-migration.sql`
-10. `booking-time-validation-migration.sql`
-11. `service-images-migration.sql`
-12. `hero-image-migration.sql`
-13. `clear-client-records-migration.sql` (nécessaire au bouton de suppression et au nettoyage automatique après sept jours)
+3. `availability-migration.sql`
+4. `barbers-availability-migration.sql`
+5. `reservation-status-migration.sql`
+6. `delete-client-reservation-migration.sql`
+7. `instant-booking-migration.sql`
+8. `booking-time-validation-migration.sql`
+9. `service-images-migration.sql`
+10. `hero-image-migration.sql`
+11. `loyalty-program-settings-migration.sql`
+12. `loyalty-steps-migration.sql`
+13. `loyalty-reward-auto-reset-migration.sql`
+14. `clear-client-records-migration.sql`
+
+`loyalty-first-login-fix.sql` est un script de réparation pour les anciennes bases dont la procédure de première connexion fidélité n’a pas été mise à jour. La version actuelle de cette procédure est déjà incluse dans `loyalty-migration.sql`, donc ce correctif ne sert pas lors d’une nouvelle installation.
+
+Pour une base déjà utilisée, ne relancez pas toute la liste : exécutez seulement les migrations qui n’y ont pas encore été appliquées. Pour activer la remise à zéro automatique après une récompense, une base ayant déjà les réglages fidélité doit uniquement recevoir `loyalty-reward-auto-reset-migration.sql`.
 
 Créez ensuite un compte dans Supabase Auth, puis attribuez-lui le rôle admin avec son UUID :
 

@@ -48,15 +48,12 @@ export default function LoyaltyScreen() {
   const [loyaltySteps, setLoyaltySteps] = useState(() => getLoyaltyProgramSteps(DEFAULT_LOYALTY_PROGRAM))
   const [isLoadingLoyaltyData, setIsLoadingLoyaltyData] = useState(false)
   const [loyaltyLoadAttempt, setLoyaltyLoadAttempt] = useState(0)
-  const [isLoyaltyProgramLoaded, setIsLoyaltyProgramLoaded] = useState(false)
+  const [isLoyaltyProgramLoaded, setIsLoyaltyProgramLoaded] = useState(() => !supabase)
   const [showRewardCelebration, setShowRewardCelebration] = useState(false)
   const rewardClaimInFlight = useRef(false)
 
   useEffect(() => {
-    if (!supabase) {
-      setIsLoyaltyProgramLoaded(true)
-      return undefined
-    }
+    if (!supabase) return undefined
     let mounted = true
     const loadLoyaltyProgram = async () => {
       const { data, error } = await supabase
@@ -128,7 +125,7 @@ export default function LoyaltyScreen() {
 
     void claimReward()
     return undefined
-  }, [card?.points, isLoyaltyProgramLoaded, loyaltyProgram.loyalty_visits_for_reward, refreshLoyaltyData])
+  }, [card, isLoyaltyProgramLoaded, loyaltyProgram.loyalty_visits_for_reward, refreshLoyaltyData])
 
   useEffect(() => {
     if (!session || !supabase) {
