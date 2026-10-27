@@ -758,7 +758,9 @@ function PublicSite() {
           </div>
           <div className="mx-auto flex w-full max-w-sm items-center justify-center self-center py-3">
             <div className="flex flex-col items-center">
-              <img src="/footer-logo.png" alt="Just Lösung" className="h-auto w-full max-w-[240px] object-contain" />
+              <a href="https://just-losung.vercel.app/" target="_blank" rel="noopener noreferrer" aria-label="Visiter la plateforme Just Lösung" className="inline-flex transition-opacity hover:opacity-80">
+                <img src="/footer-logo.png" alt="Just Lösung" className="h-auto w-full max-w-[240px] object-contain" />
+              </a>
               <p className="mt-2 text-center text-xs text-zinc-400">Développé par</p>
             </div>
           </div>
