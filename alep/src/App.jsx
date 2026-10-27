@@ -47,6 +47,26 @@ function isFutureSwissSlot(appointmentDate, appointmentTime) {
   return `${appointmentDate}T${appointmentTime}` > currentSwissTime
 }
 
+function isSalonOpenNow(scheduleRows, date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Zurich',
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map(({ type, value }) => [type, value]))
+  const currentMinutes = Number(values.hour) * 60 + Number(values.minute)
+  const today = new Intl.DateTimeFormat('fr-CH', { timeZone: 'Europe/Zurich', weekday: 'long' }).format(date)
+  const todayRow = scheduleRows.find(([day]) => day.toLocaleLowerCase('fr-CH') === today)
+  const ranges = [...(todayRow?.[1] ?? '').matchAll(/(\d{2}):(\d{2})\s*[–-]\s*(\d{2}):(\d{2})/g)]
+  return ranges.some(([, startHour, startMinute, endHour, endMinute]) => {
+    const opensAt = Number(startHour) * 60 + Number(startMinute)
+    const closesAt = Number(endHour) * 60 + Number(endMinute)
+    return currentMinutes >= opensAt && currentMinutes < closesAt
+  })
+}
+
 function formatServicePrice(price) {
   const value = String(price ?? '').trim()
   if (!value || /chf/i.test(value)) return value
@@ -192,6 +212,7 @@ function PublicSite() {
   const [managedServices, setManagedServices] = useState([])
   const [isManagedServicesLoaded, setIsManagedServicesLoaded] = useState(false)
   const [managedBarbers, setManagedBarbers] = useState([])
+  const [isSalonOpen, setIsSalonOpen] = useState(() => isSalonOpenNow(fallbackSalons[0].schedule.FR))
   const [bookingOpen, setBookingOpen] = useState(false)
   const [bookingDraft, setBookingDraft] = useState({ salonId: 'bienne', barberId: '', serviceName: '', clientName: '', clientPhone: '+41 ', appointmentDate: '', slotId: '' })
   const [bookingStatus, setBookingStatus] = useState(null)
@@ -208,6 +229,12 @@ function PublicSite() {
     '--site-button-color': managedBranding.button_color || BUTTON_COLOR_OPTIONS[0].value,
     '--site-button-text': getButtonTextColor(managedBranding.button_color),
   }
+
+  useEffect(() => {
+    const updateSalonStatus = () => setIsSalonOpen(isSalonOpenNow(fallbackSalons[0].schedule.FR))
+    const timer = window.setInterval(updateSalonStatus, 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -669,6 +696,17 @@ function PublicSite() {
           <div className="hero-grid absolute inset-0 -z-10" />
           <div className="relative mx-auto flex w-full max-w-[1440px] items-center">
             <div className="hero-copy relative z-10 max-w-2xl py-12 lg:py-0">
+              <a
+                href="https://www.google.com/maps?cid=4337053876691540753"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-sm transition hover:border-amber-200/70 hover:bg-black/60"
+                aria-label={language === 'FR' ? 'Voir Alep Salon sur Google Maps' : 'Alep Salon auf Google Maps ansehen'}
+              >
+                <span className={`h-2 w-2 rounded-full ${isSalonOpen ? 'bg-emerald-400' : 'bg-zinc-400'}`} />
+                {isSalonOpen ? (language === 'FR' ? 'Ouvert' : 'Geöffnet') : (language === 'FR' ? 'Fermé' : 'Geschlossen')}
+                <ArrowUpRight size={12} />
+              </a>
               <h1 data-hero-reveal className="hero-title font-display text-[clamp(5rem,12vw,10rem)] font-black uppercase leading-[0.82] tracking-[-0.075em] text-white">
                 Alep<br />Salon
               </h1>
