@@ -6,6 +6,8 @@ import {
   AtSign,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Download,
   MapPin,
   Menu,
@@ -394,6 +396,9 @@ function PublicSite() {
     const loadAvailableSlots = async () => {
       setAvailableSlots([])
       setIsLoadingSlots(true)
+      const swissToday = getSwissDateTime()
+      const lastAllowedDate = new Date(Number(swissToday.year), Number(swissToday.month) + 1, 0)
+      const maxDate = `${lastAllowedDate.getFullYear()}-${String(lastAllowedDate.getMonth() + 1).padStart(2, '0')}-${String(lastAllowedDate.getDate()).padStart(2, '0')}`
       const { data, error } = await supabase
         .from('availability_slots')
         .select('id, appointment_date, appointment_time')
@@ -401,11 +406,12 @@ function PublicSite() {
         .eq('barber_id', bookingDraft.barberId)
         .eq('is_active', true)
         .is('reserved_at', null)
-        .gte('appointment_date', `${getSwissDateTime().year}-${getSwissDateTime().month}-${getSwissDateTime().day}`)
+        .gte('appointment_date', `${swissToday.year}-${swissToday.month}-${swissToday.day}`)
+        .lte('appointment_date', maxDate)
         .order('appointment_date')
         .order('appointment_time')
       if (!isMounted) return
-      setAvailableSlots(error ? [] : (data ?? []).filter((slot) => isFutureSwissSlot(slot.appointment_date, slot.appointment_time)))
+      setAvailableSlots(error ? [] : (data ?? []).filter((slot) => slot.appointment_date <= maxDate && isFutureSwissSlot(slot.appointment_date, slot.appointment_time)))
       setIsLoadingSlots(false)
     }
     void loadAvailableSlots()
@@ -886,7 +892,20 @@ function BookingModal({ language, services, draft, onChange, onClose, onSubmit, 
   const availableDates = [...new Set(availableSlots.map((slot) => slot.appointment_date))]
   const timeSlots = availableSlots.filter((slot) => slot.appointment_date === draft.appointmentDate)
   const salonBarbers = barbers.filter((barber) => barber.salon_id === draft.salonId)
-  const formatBookingDate = (date) => new Intl.DateTimeFormat(isGerman ? 'de-CH' : 'fr-CH', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${date}T12:00:00`))
+  const swissToday = getSwissDateTime()
+  const currentMonth = new Date(Number(swissToday.year), Number(swissToday.month) - 1, 1)
+  const lastAllowedMonth = new Date(Number(swissToday.year), Number(swissToday.month), 1)
+  const [calendarMonth, setCalendarMonth] = useState(currentMonth)
+  const monthIndex = (date) => date.getFullYear() * 12 + date.getMonth()
+  const canGoPrevious = monthIndex(calendarMonth) > monthIndex(currentMonth)
+  const canGoNext = monthIndex(calendarMonth) < monthIndex(lastAllowedMonth)
+  const monthStartOffset = (calendarMonth.getDay() + 6) % 7
+  const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate()
+  const calendarCells = [...Array(monthStartOffset).fill(null), ...Array.from({ length: daysInMonth }, (_, index) => index + 1)]
+  while (calendarCells.length % 7) calendarCells.push(null)
+  const formatCalendarDate = (day) => `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const monthLabel = new Intl.DateTimeFormat(isGerman ? 'de-CH' : 'fr-CH', { month: 'long', year: 'numeric' }).format(calendarMonth)
+  const weekdayLabels = isGerman ? ['M', 'D', 'M', 'D', 'F', 'S', 'S'] : ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/75 px-4 py-6 backdrop-blur-sm sm:px-6" role="dialog" aria-modal="true" aria-labelledby="booking-title">
@@ -917,7 +936,25 @@ function BookingModal({ language, services, draft, onChange, onClose, onSubmit, 
           </section>
           <section>
             <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{isGerman ? 'Verfügbares Datum' : 'Date disponible'}</span>
-            {!draft.barberId ? <p className="border border-dashed border-zinc-700 px-4 py-3 text-xs text-zinc-500">{isGerman ? 'Wähle zuerst einen Barber.' : 'Choisissez d’abord un barbier.'}</p> : isLoadingSlots ? <p className="border border-dashed border-zinc-700 px-4 py-3 text-xs text-zinc-500">{isGerman ? 'Verfügbarkeiten werden geladen…' : 'Chargement des disponibilités…'}</p> : availableDates.length === 0 ? <p className="border border-dashed border-zinc-700 px-4 py-3 text-xs text-zinc-500">{isGerman ? 'Noch keine Termine verfügbar.' : 'Aucune date disponible pour le moment.'}</p> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{availableDates.map((date) => <button type="button" key={date} onClick={() => { onChange('appointmentDate', date); onChange('slotId', '') }} className={`border px-3 py-3 text-xs font-bold uppercase tracking-wide transition ${draft.appointmentDate === date ? 'border-amber-200 bg-amber-200 text-zinc-950' : 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-amber-200 hover:text-amber-200'}`}>{formatBookingDate(date)}</button>)}</div>}
+            {!draft.barberId ? <p className="border border-dashed border-zinc-700 px-4 py-3 text-xs text-zinc-500">{isGerman ? 'Wähle zuerst einen Barber.' : 'Choisissez d’abord un barbier.'}</p> : <div className="border border-zinc-800 bg-zinc-950 p-4 sm:p-5">
+              <div className="mb-5 flex items-center justify-between">
+                <button type="button" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))} disabled={!canGoPrevious} aria-label={isGerman ? 'Vorheriger Monat' : 'Mois précédent'} className="p-1 text-sky-300 transition hover:text-white disabled:opacity-20"><ChevronLeft size={18} /></button>
+                <h3 className="text-base font-bold capitalize text-zinc-100">{monthLabel}</h3>
+                <button type="button" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))} disabled={!canGoNext} aria-label={isGerman ? 'Nächster Monat' : 'Mois suivant'} className="p-1 text-sky-300 transition hover:text-white disabled:opacity-20"><ChevronRight size={18} /></button>
+              </div>
+              <div className="grid grid-cols-7 gap-1 text-center">
+                {weekdayLabels.map((label, index) => <span key={`${label}-${index}`} className="pb-2 text-xs text-zinc-600">{label}</span>)}
+                {calendarCells.map((day, index) => {
+                  if (!day) return <span key={`empty-${index}`} aria-hidden="true" />
+                  const date = formatCalendarDate(day)
+                  const isAvailable = availableDates.includes(date)
+                  const isSelected = draft.appointmentDate === date
+                  return <button type="button" key={date} disabled={!isAvailable || isLoadingSlots} aria-pressed={isSelected} aria-label={new Intl.DateTimeFormat(isGerman ? 'de-CH' : 'fr-CH', { dateStyle: 'full' }).format(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day, 12))} onClick={() => { onChange('appointmentDate', date); onChange('slotId', '') }} className={`flex aspect-square items-center justify-center rounded-xl border text-sm transition ${isSelected ? 'border-amber-200 bg-amber-200 font-bold text-zinc-950' : isAvailable ? 'border-emerald-700 text-zinc-100 hover:bg-emerald-950' : 'border-transparent text-zinc-800 opacity-60'}`}>{day}</button>
+                })}
+              </div>
+              {isLoadingSlots && <p role="status" className="mt-3 text-center text-xs text-zinc-500">{isGerman ? 'Verfügbarkeiten werden geladen…' : 'Chargement des disponibilités…'}</p>}
+              {!isLoadingSlots && availableDates.length === 0 && <p className="mt-3 text-center text-xs text-zinc-500">{isGerman ? 'Keine Termine in diesem Zeitraum verfügbar.' : 'Aucune date disponible pour ce barbier dans les deux prochains mois.'}</p>}
+            </div>}
           </section>
           <section>
             <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{isGerman ? 'Verfügbare Uhrzeit' : 'Heure disponible'}</span>
