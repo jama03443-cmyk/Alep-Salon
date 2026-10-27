@@ -730,8 +730,8 @@ function PublicSite() {
           <div className="hero-grid absolute inset-0 -z-10" />
           <div className="relative mx-auto flex w-full max-w-[1440px] items-center">
             <div className="hero-copy relative z-10 max-w-2xl py-12 lg:py-0">
-              <div className="mb-10 inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-500 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white shadow-lg shadow-emerald-950/25">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${salonStatus.isOpen ? 'bg-white' : 'bg-zinc-200'}`} />
+              <div className={`mb-10 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white shadow-lg ${salonStatus.isOpen ? 'border-[#25D366] bg-[#25D366] shadow-emerald-950/25' : 'border-red-500 bg-red-600 shadow-red-950/25'}`}>
+                <span className="h-2 w-2 shrink-0 rounded-full bg-white" />
                 <span>{salonStatus.isOpen ? (language === 'FR' ? 'Ouvert' : 'Geöffnet') : (language === 'FR' ? 'Fermé' : 'Geschlossen')}</span>
                 <span className="font-semibold normal-case tracking-normal">· {salonStatus.detail}</span>
               </div>
