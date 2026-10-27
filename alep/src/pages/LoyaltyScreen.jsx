@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { gsap } from 'gsap'
 import { ArrowLeft, CheckCircle2, Copy, Gift, History, LogIn, LogOut, Minus, Plus, Scissors, ShieldCheck, Sparkles, Star, UserRound, UsersRound } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Link, useLocation } from 'react-router-dom'
@@ -47,6 +48,8 @@ export default function LoyaltyScreen() {
   const [loyaltySteps, setLoyaltySteps] = useState(() => getLoyaltyProgramSteps(DEFAULT_LOYALTY_PROGRAM))
   const [isLoadingLoyaltyData, setIsLoadingLoyaltyData] = useState(false)
   const [loyaltyLoadAttempt, setLoyaltyLoadAttempt] = useState(0)
+  const [showRewardCelebration, setShowRewardCelebration] = useState(false)
+  const previousPoints = useRef(null)
 
   useEffect(() => {
     if (!supabase) return undefined
@@ -92,6 +95,22 @@ export default function LoyaltyScreen() {
     const timeout = window.setTimeout(() => setToast(null), 4600)
     return () => window.clearTimeout(timeout)
   }, [toast])
+
+  useEffect(() => {
+    if (!card) {
+      previousPoints.current = null
+      return
+    }
+
+    const pointsNow = Number(card.points) || 0
+    const pointsForReward = Math.max(1, (Number(loyaltyProgram.loyalty_visits_for_reward) || 10) - 1)
+    const pointsBefore = previousPoints.current
+    previousPoints.current = pointsNow
+
+    if (pointsBefore !== null && pointsBefore < pointsForReward && pointsNow >= pointsForReward) {
+      setShowRewardCelebration(true)
+    }
+  }, [card?.points, loyaltyProgram.loyalty_visits_for_reward])
 
   useEffect(() => {
     if (!session || !supabase) {
@@ -262,6 +281,7 @@ export default function LoyaltyScreen() {
 
   return <main className="pwa-loyalty-page min-h-screen bg-zinc-950 px-5 py-8 text-zinc-100 sm:px-8 lg:px-10">
     {toast && <SuccessToast title={toast.title} text={toast.text} />}
+    {showRewardCelebration && <RewardCelebration onClose={() => setShowRewardCelebration(false)} />}
     <div className="mx-auto max-w-5xl">
       <header className="flex items-center justify-between border-b border-zinc-800 pb-6">
         <div className="flex min-w-0 items-center gap-4">
@@ -312,6 +332,50 @@ function WhatsAppField({ value, onChange }) {
     <span className="mt-2 block text-[10px] leading-4 text-zinc-600">Entrez 79 123 45 67, 079 123 45 67 ou +41 79 123 45 67.</span>
   </label>
 }
+function RewardCelebration({ onClose }) {
+  const giftRef = useRef(null)
+  const lidRef = useRef(null)
+  const messageRef = useRef(null)
+  const sparklesRef = useRef(null)
+
+  useEffect(() => {
+    const context = gsap.context(() => {
+      gsap.set(giftRef.current, { y: -window.innerHeight * 0.75, rotationY: 0, scale: 0.72 })
+      gsap.set(lidRef.current, { rotationX: 0, transformOrigin: '50% 100%' })
+      gsap.set(messageRef.current, { autoAlpha: 0, y: 28, scale: 0.86 })
+      gsap.set(sparklesRef.current, { autoAlpha: 0, scale: 0.3, rotation: -35 })
+      const timeline = gsap.timeline()
+      timeline.to(giftRef.current, { y: 0, scale: 1, duration: 0.95, ease: 'bounce.out' })
+        .to(giftRef.current, { rotationY: 360, duration: 0.9, ease: 'power2.inOut' })
+        .to(lidRef.current, { rotationX: -125, duration: 0.55, ease: 'back.out(1.8)' }, '-=0.08')
+        .to(sparklesRef.current, { autoAlpha: 1, scale: 1, rotation: 0, duration: 0.42, ease: 'back.out(2)' }, '-=0.28')
+        .to(messageRef.current, { autoAlpha: 1, y: 0, scale: 1, duration: 0.5, ease: 'back.out(1.7)' }, '-=0.12')
+      gsap.to(giftRef.current, { y: -5, duration: 0.8, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 2.9 })
+    })
+    return () => context.revert()
+  }, [])
+
+  return <div className="fixed inset-0 z-[130] flex items-center justify-center overflow-hidden bg-black/80 px-5 py-8 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="reward-celebration-title">
+    <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-orange-300/40 bg-zinc-950 px-6 pb-8 pt-5 text-center shadow-[0_0_90px_rgba(249,115,22,0.22)] sm:px-10">
+      <button type="button" onClick={onClose} aria-label="Fermer" className="absolute right-4 top-4 z-20 rounded-full border border-zinc-700 p-2 text-zinc-400 transition hover:text-white"><span aria-hidden="true">×</span></button>
+      <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-orange-300">Récompense débloquée</p>
+      <div className="relative mx-auto mt-4 flex h-48 items-center justify-center" style={{ perspective: '900px' }}>
+        <div ref={sparklesRef} className="pointer-events-none absolute inset-0 text-orange-300" aria-hidden="true"><Sparkles className="absolute left-7 top-8 h-8 w-8" /><Sparkles className="absolute right-7 top-5 h-6 w-6 text-amber-200" /><Sparkles className="absolute bottom-8 left-1/4 h-5 w-5 text-amber-200" /><Sparkles className="absolute bottom-7 right-1/4 h-7 w-7" /></div>
+        <div ref={giftRef} className="relative h-28 w-36" style={{ transformStyle: 'preserve-3d' }}>
+          <div className="absolute -inset-x-2 -top-4 z-20 h-7 rounded-md border border-orange-200/80 bg-gradient-to-r from-orange-400 via-amber-300 to-orange-500 shadow-lg" style={{ transformOrigin: '50% 100%', transformStyle: 'preserve-3d' }} ref={lidRef}><span className="absolute left-1/2 top-0 h-full w-5 -translate-x-1/2 bg-amber-100/90" /></div>
+          <div className="absolute inset-0 overflow-hidden rounded-b-lg border border-orange-200/70 bg-gradient-to-br from-orange-400 via-orange-500 to-orange-700 shadow-[inset_-12px_-10px_20px_rgba(124,45,18,0.35)]"><span className="absolute inset-y-0 left-1/2 w-6 -translate-x-1/2 bg-amber-100 shadow-[0_0_18px_rgba(255,237,173,0.55)]" /><span className="absolute inset-x-0 top-1/2 h-5 -translate-y-1/2 bg-amber-100/90" /></div>
+          <div className="absolute -top-10 left-1/2 z-10 h-10 w-14 -translate-x-1/2" aria-hidden="true"><span className="absolute left-1 top-2 h-7 w-7 rotate-[-35deg] rounded-full border-[6px] border-amber-200" /><span className="absolute right-1 top-2 h-7 w-7 rotate-[35deg] rounded-full border-[6px] border-amber-200" /></div>
+        </div>
+      </div>
+      <div ref={messageRef}>
+        <h2 id="reward-celebration-title" className="font-display text-3xl font-bold uppercase leading-tight text-white">Votre coupe est gratuite !</h2>
+        <p className="mt-3 text-sm font-semibold text-orange-200">Félicitations !</p>
+        <button type="button" onClick={onClose} className="button-primary mt-6 w-full">Super, merci !</button>
+      </div>
+    </div>
+  </div>
+}
+
 function LoyaltyCard({ card, events, copied, onCopy, rewardVisits }) { if (!card) return <LoadingScreen />; const qrValue = `ALEP-LOYALTY:${card.member_code}`; const pointsForReward = Math.max(1, (Number(rewardVisits) || 10) - 1); const pointsRemaining = Math.max(0, pointsForReward - Number(card.points || 0)); return <section className="mx-auto mt-12 max-w-3xl"><p className="text-center text-[10px] font-bold uppercase tracking-[0.24em] text-amber-200">Votre carte fidélité</p><h1 className="mt-4 text-center font-display text-5xl font-bold uppercase leading-none tracking-tight sm:text-6xl">Bienvenue dans le club.</h1><div className="mt-9 overflow-hidden border border-amber-200/30 bg-[radial-gradient(circle_at_90%_0%,rgba(253,230,138,0.17),transparent_35%),linear-gradient(135deg,#18181b,#09090b)] p-6 sm:p-10"><div className="flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-baseline gap-3"><span className="font-display text-8xl font-bold leading-none text-amber-200">{card.points}</span><span className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">points collectés</span></div><p className="mt-5 text-sm text-zinc-400">Présentez votre code QR à l’équipe pour ajouter vos points à chaque visite.</p><p className="mt-2 text-xs text-zinc-600">Membre depuis {formatMemberSince(card.downloaded_at)}</p></div><div className="shrink-0 bg-zinc-50 p-3"><QRCodeSVG value={qrValue} size={168} level="M" includeMargin /></div></div><div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between"><span className="break-all font-mono text-xs text-zinc-500">{card.member_code}</span><button type="button" onClick={onCopy} className="inline-flex items-center gap-2 self-start text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-300 transition hover:text-amber-200"><Copy size={14} />{copied ? 'Code copié' : 'Copier le code'}</button></div></div><p className="mt-4 text-center text-sm font-semibold text-amber-200">{pointsRemaining === 0 ? 'Votre coupe offerte vous attend.' : `Encore ${pointsRemaining} point${pointsRemaining === 1 ? '' : 's'} avant votre coupe offerte.`}</p><div className="mt-6 flex items-center justify-center gap-2 text-xs text-zinc-500"><Gift size={15} className="text-amber-200" /> Vos points sont ajoutés à votre carte numérique par l’équipe après chaque visite.</div><HistoryList events={events} /></section> }
 function HistoryList({ events }) { return <section className="mt-10 border border-zinc-800 bg-zinc-900/35"><div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4 sm:px-6"><h2 className="flex items-center gap-2 font-display text-2xl font-bold uppercase tracking-tight"><History size={19} className="text-amber-200" /> Historique des points</h2><span className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{events.length} opération{events.length === 1 ? '' : 's'}</span></div>{events.length === 0 ? <p className="px-5 py-10 text-center text-sm text-zinc-500">Aucun point n’a encore été collecté. Présentez votre QR code lors de votre prochaine visite.</p> : <ul className="divide-y divide-zinc-800">{events.map((event) => <PointEvent key={event.id} event={event} />)}</ul>}</section> }
 function PointEvent({ event }) { const isCredit = event.point_delta > 0; const date = new Intl.DateTimeFormat('fr-CH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.created_at)); return <li className="flex items-center justify-between gap-4 px-5 py-4 sm:px-6"><span className="flex items-center gap-3"><span className={`flex h-8 w-8 items-center justify-center rounded-full ${isCredit ? 'bg-emerald-400/10 text-emerald-400' : 'bg-amber-200/10 text-amber-200'}`}>{isCredit ? <Plus size={15} /> : <Minus size={15} />}</span><span><strong className="block text-sm text-zinc-200">{isCredit ? 'Visite validée' : 'Points utilisés'}</strong><span className="mt-0.5 block text-xs text-zinc-500">{date}</span></span></span><strong className={isCredit ? 'text-emerald-400' : 'text-amber-200'}>{isCredit ? '+' : ''}{event.point_delta} point{Math.abs(event.point_delta) === 1 ? '' : 's'}</strong></li> }
