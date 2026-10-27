@@ -757,7 +757,10 @@ function PublicSite() {
             <p className="mt-4 max-w-xs text-xs leading-5 text-zinc-600">{t.footerText}</p>
           </div>
           <div className="mx-auto flex w-full max-w-sm items-center justify-center self-center py-3">
-            <img src="/footer-logo.png" alt="Just Lösung" className="h-auto w-full max-w-[240px] object-contain" />
+            <div className="flex flex-col items-center">
+              <img src="/footer-logo.png" alt="Just Lösung" className="h-auto w-full max-w-[240px] object-contain" />
+              <p className="mt-2 text-center text-xs text-zinc-400">Développé par Just Lösung</p>
+            </div>
           </div>
           <div className="flex flex-col gap-3 text-xs text-zinc-500 sm:items-end">
             <div className="flex items-center gap-5 uppercase tracking-[0.16em]"><a href="#top" className="hover:text-zinc-200">{t.legal}</a><a href="#top" className="hover:text-zinc-200">{t.privacy}</a><a href="#top" className="hover:text-zinc-200"><AtSign size={15} /></a></div>
