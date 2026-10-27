@@ -41,16 +41,15 @@ export default function PwaBottomNav({ language = 'FR', onReserve }) {
   if (!isMobilePwa) return null
 
   return <nav className="pwa-bottom-nav" aria-label={isGerman ? 'Schnellnavigation' : 'Navigation rapide'}>
-    <Link to="/fidelite" className="pwa-bottom-nav__item" aria-label={isGerman ? 'Treueprogramm' : 'Fidélité'}>
+    <Link to="/fidelite" className="pwa-bottom-nav__item pwa-bottom-nav__item--loyalty" aria-label={isGerman ? 'Treueprogramm' : 'Fidélité'}>
       <CreditCard size={21} strokeWidth={1.8} />
       <span>{isGerman ? 'Treue' : 'Fidélité'}</span>
     </Link>
     {onReserve
       ? <button type="button" onClick={onReserve} className="pwa-bottom-nav__reserve"><CalendarDays size={17} /><span>{isGerman ? 'Schnitt buchen' : 'Réserver ma coupe'}</span></button>
       : <Link to="/?openBooking=1" className="pwa-bottom-nav__reserve"><CalendarDays size={17} /><span>{isGerman ? 'Schnitt buchen' : 'Réserver ma coupe'}</span></Link>}
-    <a href={whatsappUrl} target="_blank" rel="noreferrer" className="pwa-bottom-nav__item" aria-label="WhatsApp Alep Salon">
+    <a href={whatsappUrl} target="_blank" rel="noreferrer" className="pwa-bottom-nav__item pwa-bottom-nav__item--whatsapp" aria-label="WhatsApp Alep Salon">
       <img src="/whatsapp-icon-transparent.png" alt="" />
-      <span>WhatsApp</span>
     </a>
   </nav>
 }

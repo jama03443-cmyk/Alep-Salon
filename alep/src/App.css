@@ -159,6 +159,9 @@
 
   .pwa-bottom-nav__item svg { color: #e7c77b; }
   .pwa-bottom-nav__item img { width: 1.45rem; height: 1.45rem; object-fit: contain; }
+  .pwa-bottom-nav__item--loyalty { gap: 0.25rem; font-size: 0.68rem; }
+  .pwa-bottom-nav__item--loyalty svg { width: 1.7rem; height: 1.7rem; }
+  .pwa-bottom-nav__item--whatsapp img { width: 2.1rem; height: 2.1rem; }
 
   .pwa-bottom-nav__reserve {
     display: flex;
@@ -172,7 +175,7 @@
     padding: 0.35rem 0.55rem;
     background: var(--site-button-color, #d9ad3b);
     color: var(--site-button-text, #201a0b);
-    font-size: clamp(0.56rem, 2.5vw, 0.68rem);
+    font-size: clamp(0.68rem, 3vw, 0.8rem);
     font-weight: 800;
     letter-spacing: 0.035em;
     line-height: 1.1;
