@@ -120,6 +120,75 @@
 
 .pwa-install-popup { animation: pwa-install-drop 650ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 
+.pwa-bottom-nav { display: none; }
+
+@media (max-width: 767px) {
+  html.has-mobile-pwa-nav .site-shell,
+  html.has-mobile-pwa-nav .pwa-loyalty-page {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  html.has-mobile-pwa-nav .pwa-bottom-nav {
+    position: fixed;
+    z-index: 80;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.7fr) minmax(0, 0.85fr);
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem calc(0.55rem + env(safe-area-inset-bottom));
+    border-top: 1px solid rgb(217 173 59 / 30%);
+    background: rgb(12 11 10 / 96%);
+    box-shadow: 0 -8px 28px rgb(0 0 0 / 24%);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .pwa-bottom-nav__item {
+    display: flex;
+    min-width: 0;
+    min-height: 2.8rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    color: #f5f1e8;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .pwa-bottom-nav__item svg { color: #e7c77b; }
+  .pwa-bottom-nav__item img { width: 1.45rem; height: 1.45rem; object-fit: contain; }
+
+  .pwa-bottom-nav__reserve {
+    display: flex;
+    min-width: 0;
+    min-height: 2.8rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border: 1px solid var(--site-button-color, #d9ad3b);
+    border-radius: 9999px;
+    padding: 0.35rem 0.55rem;
+    background: var(--site-button-color, #d9ad3b);
+    color: var(--site-button-text, #201a0b);
+    font-size: clamp(0.56rem, 2.5vw, 0.68rem);
+    font-weight: 800;
+    letter-spacing: 0.035em;
+    line-height: 1.1;
+    text-align: center;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .pwa-bottom-nav__reserve svg { flex: 0 0 auto; }
+  .whatsapp-floating-button { display: none; }
+}
+
 @keyframes pwa-install-drop {
   from { opacity: 0; transform: translateY(-120%) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }

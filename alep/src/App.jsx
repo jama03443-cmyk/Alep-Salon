@@ -18,6 +18,7 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react
 import { AuthProvider } from './auth/AuthContext'
 import { useAuth } from './auth/useAuth'
 import { isSupabaseConfigured, supabase } from './supabaseClient'
+import PwaBottomNav from './PwaBottomNav'
 import { BODY_COLOR_OPTIONS, BUTTON_COLOR_OPTIONS, FOOTER_COLOR_OPTIONS, getButtonTextColor, getContrastTextColor } from './siteBranding'
 import './App.css'
 
@@ -493,6 +494,20 @@ function PublicSite() {
     setBookingOpen(true)
   }
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (!params.has('openBooking')) return
+    params.delete('openBooking')
+    const query = params.toString()
+    window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`)
+    const timer = window.setTimeout(() => {
+      setBookingStatus(null)
+      setBookingDraft((current) => ({ ...current, salonId: 'bienne', appointmentDate: '', slotId: '' }))
+      setBookingOpen(true)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
+
   const submitBooking = async (event) => {
     event.preventDefault()
     if (isBooking || bookingStatus?.type === 'success') return
@@ -816,6 +831,7 @@ function PublicSite() {
           </div>
         </div>
       )}
+      <PwaBottomNav language={language} onReserve={() => handleBooking()} />
       {!new URLSearchParams(window.location.search).has('phonePreview') && <WhatsAppContacts language={language} />}
     </div>
   )
@@ -846,7 +862,7 @@ function WhatsAppContacts({ language }) {
       target="_blank"
       rel="noreferrer"
       aria-label={language === 'FR' ? 'Contacter Alep Salon sur WhatsApp' : 'Alep Salon auf WhatsApp kontaktieren'}
-      className="group fixed right-4 top-1/2 z-[70] flex -translate-y-1/2 flex-col items-center text-white no-underline sm:right-6"
+      className="whatsapp-floating-button group fixed right-4 top-1/2 z-[70] flex -translate-y-1/2 flex-col items-center text-white no-underline sm:right-6"
     >
       <span className="flex h-20 w-20 items-center justify-center rounded-full drop-shadow-[0_6px_12px_rgba(0,0,0,0.35)] transition-transform group-hover:scale-110">
         <img src="/whatsapp-icon-transparent.png" alt="" className="h-full w-full object-contain" />

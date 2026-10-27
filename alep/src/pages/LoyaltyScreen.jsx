@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { isSupabaseConfigured, supabase } from '../supabaseClient'
 import { DEFAULT_LOYALTY_PROGRAM, getLoyaltyProgramSettings, LOYALTY_PROGRAM_CARDS } from '../loyaltyProgram'
+import PwaBottomNav from '../PwaBottomNav'
 
 function formatMemberSince(date) {
   if (!date) return '—'
@@ -33,20 +34,18 @@ export default function LoyaltyScreen() {
   const [profile, setProfile] = useState(null)
   const [card, setCard] = useState(null)
   const [pointEvents, setPointEvents] = useState([])
-  const [errorMessage, setErrorMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState(() => {
+    const params = new URLSearchParams(location.search)
+    const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''))
+    const authError = params.get('error_description') || params.get('error') || hashParams.get('error_description') || hashParams.get('error')
+    return authError ? `Connexion Google impossible : ${authError.replaceAll('+', ' ')}` : ''
+  })
   const [toast, setToast] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [copied, setCopied] = useState(false)
   const [loyaltyProgram, setLoyaltyProgram] = useState(DEFAULT_LOYALTY_PROGRAM)
   const [isLoadingLoyaltyData, setIsLoadingLoyaltyData] = useState(false)
   const [loyaltyLoadAttempt, setLoyaltyLoadAttempt] = useState(0)
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''))
-    const authError = params.get('error_description') || params.get('error') || hashParams.get('error_description') || hashParams.get('error')
-    if (authError) setErrorMessage(`Connexion Google impossible : ${authError.replaceAll('+', ' ')}`)
-  }, [location.hash, location.search])
 
   useEffect(() => {
     if (!supabase) return undefined
@@ -92,7 +91,6 @@ export default function LoyaltyScreen() {
 
   useEffect(() => {
     if (!session || !supabase) {
-      setIsLoadingLoyaltyData(false)
       return undefined
     }
     let mounted = true
@@ -258,7 +256,7 @@ export default function LoyaltyScreen() {
 
   if (isLoading) return <LoadingScreen />
 
-  return <main className="min-h-screen bg-zinc-950 px-5 py-8 text-zinc-100 sm:px-8 lg:px-10">
+  return <main className="pwa-loyalty-page min-h-screen bg-zinc-950 px-5 py-8 text-zinc-100 sm:px-8 lg:px-10">
     {toast && <SuccessToast title={toast.title} text={toast.text} />}
     <div className="mx-auto max-w-5xl">
       <header className="flex items-center justify-between border-b border-zinc-800 pb-6">
@@ -275,6 +273,7 @@ export default function LoyaltyScreen() {
       </section>}
       <HowItWorks settings={loyaltyProgram} />
     </div>
+    <PwaBottomNav language="FR" />
   </main>
 }
 
