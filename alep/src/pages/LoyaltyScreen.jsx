@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, CheckCircle2, Copy, Gift, History, LogIn, LogOut, Minus, Plus, Scissors, ShieldCheck, Sparkles, Star, UserRound, UsersRound } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { isSupabaseConfigured, supabase } from '../supabaseClient'
 import { DEFAULT_LOYALTY_PROGRAM, getLoyaltyProgramSettings, LOYALTY_PROGRAM_CARDS } from '../loyaltyProgram'
@@ -26,6 +26,7 @@ function swissWhatsApp(value) {
 
 export default function LoyaltyScreen() {
   const { session, isLoading, refreshAuth } = useAuth()
+  const location = useLocation()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [whatsappInput, setWhatsappInput] = useState('')
@@ -37,6 +38,15 @@ export default function LoyaltyScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [copied, setCopied] = useState(false)
   const [loyaltyProgram, setLoyaltyProgram] = useState(DEFAULT_LOYALTY_PROGRAM)
+  const [isLoadingLoyaltyData, setIsLoadingLoyaltyData] = useState(false)
+  const [loyaltyLoadAttempt, setLoyaltyLoadAttempt] = useState(0)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''))
+    const authError = params.get('error_description') || params.get('error') || hashParams.get('error_description') || hashParams.get('error')
+    if (authError) setErrorMessage(`Connexion Google impossible : ${authError.replaceAll('+', ' ')}`)
+  }, [location.hash, location.search])
 
   useEffect(() => {
     if (!supabase) return undefined
@@ -81,52 +91,61 @@ export default function LoyaltyScreen() {
   }, [toast])
 
   useEffect(() => {
-    if (!session || !supabase) return undefined
+    if (!session || !supabase) {
+      setIsLoadingLoyaltyData(false)
+      return undefined
+    }
     let mounted = true
 
     const loadLoyaltyData = async () => {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, whatsapp')
-        .eq('id', session.user.id)
-        .maybeSingle()
-      if (!mounted) return
-      if (profileError) {
-        setErrorMessage('Votre profil ne peut pas être chargé pour le moment.')
-        return
-      }
-      const currentProfile = profileData ?? { first_name: '', last_name: '', whatsapp: '' }
-      setProfile(currentProfile)
-      setFirstName(currentProfile.first_name ?? '')
-      setLastName(currentProfile.last_name ?? '')
-      setWhatsappInput(swissPhoneDigits(currentProfile.whatsapp ?? ''))
+      setIsLoadingLoyaltyData(true)
+      setErrorMessage('')
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, whatsapp')
+          .eq('id', session.user.id)
+          .maybeSingle()
+        if (!mounted) return
+        if (profileError) throw new Error('Votre profil ne peut pas être chargé. Vérifiez la connexion Supabase puis réessayez.')
 
-      const { data, error } = await supabase
-        .from('loyalty_cards')
-        .select('id, member_code, points, downloaded_at, updated_at')
-        .eq('profile_id', session.user.id)
-        .maybeSingle()
-      if (!mounted) return
-      if (error) {
-        setErrorMessage('Votre carte de fidélité ne peut pas être chargée pour le moment.')
-        return
-      }
-      setCard(data)
-      if (!data) return
+        const currentProfile = profileData ?? { first_name: '', last_name: '', whatsapp: '' }
+        setProfile(currentProfile)
+        setFirstName(currentProfile.first_name ?? '')
+        setLastName(currentProfile.last_name ?? '')
+        setWhatsappInput(swissPhoneDigits(currentProfile.whatsapp ?? ''))
 
-      const { data: events, error: eventsError } = await supabase
-        .from('loyalty_point_events')
-        .select('id, point_delta, created_at')
-        .eq('loyalty_card_id', data.id)
-        .order('created_at', { ascending: false })
-      if (!mounted) return
-      if (eventsError) setErrorMessage('Votre carte est disponible, mais son historique ne peut pas être chargé.')
-      else setPointEvents(events ?? [])
+        const { data, error } = await supabase
+          .from('loyalty_cards')
+          .select('id, member_code, points, downloaded_at, updated_at')
+          .eq('profile_id', session.user.id)
+          .maybeSingle()
+        if (!mounted) return
+        if (error) throw new Error('Votre carte fidélité ne peut pas être chargée. Vérifiez la migration fidélité dans Supabase.')
+        setCard(data)
+        if (!data && currentProfile.first_name && currentProfile.last_name && currentProfile.whatsapp) {
+          throw new Error('Votre profil est prêt, mais la carte fidélité est introuvable. Réessayez ou contactez le salon.')
+        }
+        if (!data) return
+
+        const { data: events, error: eventsError } = await supabase
+          .from('loyalty_point_events')
+          .select('id, point_delta, created_at')
+          .eq('loyalty_card_id', data.id)
+          .order('created_at', { ascending: false })
+        if (!mounted) return
+        if (eventsError) setErrorMessage('Votre carte est disponible, mais son historique ne peut pas être chargé.')
+        else setPointEvents(events ?? [])
+      } catch (error) {
+        if (mounted) setErrorMessage(error instanceof Error ? error.message : 'La fidélité est temporairement indisponible. Réessayez.')
+      } finally {
+        if (mounted) setIsLoadingLoyaltyData(false)
+      }
     }
 
     void loadLoyaltyData()
     return () => { mounted = false }
-  }, [session])
+  }, [session, loyaltyLoadAttempt])
 
   // Realtime keeps the PWA in sync; polling also covers Supabase projects
   // where Realtime has not yet been enabled for these tables.
@@ -249,7 +268,7 @@ export default function LoyaltyScreen() {
         </div>
         {session && profile && !needsProfileCompletion && <button type="button" onClick={signOut} className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition hover:text-amber-200"><LogOut size={14} /> Déconnexion</button>}
       </header>
-      {session ? <>{needsProfileCompletion ? <ProfileCompletion firstName={firstName} lastName={lastName} whatsappInput={whatsappInput} setFirstName={setFirstName} setLastName={setLastName} setWhatsappInput={setWhatsappInput} onSubmit={handleProfileCompletion} isSubmitting={isSubmitting} errorMessage={errorMessage} /> : <LoyaltyCard card={card} events={pointEvents} copied={copied} onCopy={copyCode} rewardVisits={loyaltyProgram.loyalty_visits_for_reward} />}</> : <section className="mx-auto mt-14 grid max-w-4xl gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+      {session ? isLoadingLoyaltyData || (!profile && !errorMessage) ? <LoadingScreen /> : needsProfileCompletion ? <ProfileCompletion firstName={firstName} lastName={lastName} whatsappInput={whatsappInput} setFirstName={setFirstName} setLastName={setLastName} setWhatsappInput={setWhatsappInput} onSubmit={handleProfileCompletion} isSubmitting={isSubmitting} errorMessage={errorMessage} /> : card ? <><LoyaltyCard card={card} events={pointEvents} copied={copied} onCopy={copyCode} rewardVisits={loyaltyProgram.loyalty_visits_for_reward} />{errorMessage && <InlineError>{errorMessage}</InlineError>}</> : <LoyaltyLoadFailure message={errorMessage} onRetry={() => setLoyaltyLoadAttempt((attempt) => attempt + 1)} onBack={signOut} /> : <section className="mx-auto mt-14 grid max-w-4xl gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
         <div><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200"><Sparkles size={14} /> Programme fidélité</p><h1 className="mt-5 font-display text-6xl font-bold uppercase leading-[0.86] tracking-tight sm:text-7xl">Chaque visite<br />compte.</h1><p className="mt-6 max-w-md text-sm leading-7 text-zinc-400">Connectez-vous avec Google. Lors de votre première visite, nous vous demanderons uniquement votre prénom, votre nom et votre WhatsApp.</p><div className="mt-8 grid grid-cols-3 gap-3 text-center"><Benefit label="Google sécurisé" /><Benefit label="QR personnel" /><Benefit label="Points cumulés" /></div></div>
         <section className="border border-zinc-800 bg-zinc-900/50 p-6 sm:p-8"><div className="space-y-5"><div><p className="font-display text-3xl font-bold uppercase tracking-tight">Votre carte digitale.</p><p className="mt-2 text-sm leading-6 text-zinc-500">Connectez-vous avec Google. Lors de votre première visite uniquement, vous compléterez votre prénom, votre nom et votre WhatsApp.</p></div>{errorMessage && <InlineError>{errorMessage}</InlineError>}<button type="button" onClick={handleGoogleLogin} className="flex w-full items-center justify-center gap-3 border border-zinc-600 bg-white px-5 py-4 text-sm font-bold text-zinc-950 transition hover:-translate-y-0.5 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-70" disabled={isSubmitting}><span className="flex h-6 w-6 items-center justify-center rounded-full border border-zinc-300 font-black text-blue-600">G</span>{isSubmitting ? 'Redirection vers Google…' : 'Continuer avec Google'}<LogIn size={16} /></button><p className="flex items-center justify-center gap-2 text-center text-[10px] leading-4 text-zinc-600"><ShieldCheck size={13} /> Connexion sécurisée par Google et Supabase.</p></div>
         </section>
@@ -266,6 +285,7 @@ function HistoryList({ events }) { return <section className="mt-10 border borde
 function PointEvent({ event }) { const isCredit = event.point_delta > 0; const date = new Intl.DateTimeFormat('fr-CH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.created_at)); return <li className="flex items-center justify-between gap-4 px-5 py-4 sm:px-6"><span className="flex items-center gap-3"><span className={`flex h-8 w-8 items-center justify-center rounded-full ${isCredit ? 'bg-emerald-400/10 text-emerald-400' : 'bg-amber-200/10 text-amber-200'}`}>{isCredit ? <Plus size={15} /> : <Minus size={15} />}</span><span><strong className="block text-sm text-zinc-200">{isCredit ? 'Visite validée' : 'Points utilisés'}</strong><span className="mt-0.5 block text-xs text-zinc-500">{date}</span></span></span><strong className={isCredit ? 'text-emerald-400' : 'text-amber-200'}>{isCredit ? '+' : ''}{event.point_delta} point{Math.abs(event.point_delta) === 1 ? '' : 's'}</strong></li> }
 function SuccessToast({ title, text }) { return <aside role="status" className="loyalty-toast fixed inset-x-4 top-5 z-[100] mx-auto max-w-md border border-emerald-400/50 bg-zinc-900 px-4 py-4 shadow-2xl shadow-black/60 sm:inset-x-auto sm:right-6 sm:top-6 sm:w-[25rem]"><div className="flex gap-3"><CheckCircle2 size={21} className="mt-0.5 shrink-0 text-emerald-400" /><div><strong className="block text-sm text-zinc-100">{title}</strong><p className="mt-1 text-xs leading-5 text-zinc-400">{text}</p></div></div></aside> }
 function InlineError({ children }) { return <p role="alert" className="border-l-2 border-amber-200 bg-amber-200/5 px-3 py-2 text-xs leading-5 text-amber-100">{children}</p> }
+function LoyaltyLoadFailure({ message, onRetry, onBack }) { return <section className="mx-auto mt-14 max-w-xl border border-zinc-800 bg-zinc-900/50 p-6 sm:p-8"><h1 className="font-display text-3xl font-bold uppercase">Carte indisponible</h1><p className="mt-3 text-sm leading-6 text-zinc-400">La connexion Google a réussi, mais Alep Salon n’a pas pu charger votre carte fidélité.</p><div className="mt-5"><InlineError>{message || 'Vérifiez votre connexion puis réessayez.'}</InlineError></div><div className="mt-6 flex flex-col gap-3 sm:flex-row"><button type="button" onClick={onRetry} className="button-primary flex-1">Réessayer</button><button type="button" onClick={onBack} className="button-ghost flex-1">Retour</button></div></section> }
 function HowItWorks({ settings }) {
   const visits = Math.max(2, Math.min(100, Number(settings.loyalty_visits_for_reward) || 10))
   const points = visits - 1

@@ -15,16 +15,22 @@ export function AuthProvider({ children }) {
       return
     }
 
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .maybeSingle()
+    let isAdmin = false
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .maybeSingle()
+      isAdmin = !error && profile?.role === 'admin'
+    } catch {
+      // Keep the authenticated session available even when profile lookup fails.
+    }
 
     setAuthState({
       isLoading: false,
       session,
-      isAdmin: !error && profile?.role === 'admin',
+      isAdmin,
     })
   }, [])
 
