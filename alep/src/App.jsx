@@ -47,7 +47,7 @@ function isFutureSwissSlot(appointmentDate, appointmentTime) {
   return `${appointmentDate}T${appointmentTime}` > currentSwissTime
 }
 
-function isSalonOpenNow(scheduleRows, date = new Date()) {
+function getSalonStatus(scheduleRows, language = 'FR', date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Europe/Zurich',
     weekday: 'long',
@@ -58,13 +58,47 @@ function isSalonOpenNow(scheduleRows, date = new Date()) {
   const values = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map(({ type, value }) => [type, value]))
   const currentMinutes = Number(values.hour) * 60 + Number(values.minute)
   const today = new Intl.DateTimeFormat('fr-CH', { timeZone: 'Europe/Zurich', weekday: 'long' }).format(date)
-  const todayRow = scheduleRows.find(([day]) => day.toLocaleLowerCase('fr-CH') === today)
-  const ranges = [...(todayRow?.[1] ?? '').matchAll(/(\d{2}):(\d{2})\s*[–-]\s*(\d{2}):(\d{2})/g)]
-  return ranges.some(([, startHour, startMinute, endHour, endMinute]) => {
-    const opensAt = Number(startHour) * 60 + Number(startMinute)
-    const closesAt = Number(endHour) * 60 + Number(endMinute)
-    return currentMinutes >= opensAt && currentMinutes < closesAt
-  })
+  const parseRanges = (day) => {
+    const row = scheduleRows.find(([label]) => label.toLocaleLowerCase('fr-CH') === day)
+    return [...(row?.[1] ?? '').matchAll(/(\d{2}):(\d{2})\s*[\u2013-]\s*(\d{2}):(\d{2})/g)].map(([, startHour, startMinute, endHour, endMinute]) => ({
+      opensAt: Number(startHour) * 60 + Number(startMinute),
+      closesAt: Number(endHour) * 60 + Number(endMinute),
+      openingTime: `${startHour}:${startMinute}`,
+      closingTime: `${endHour}:${endMinute}`,
+    }))
+  }
+  const todayRanges = parseRanges(today)
+  const activeRange = todayRanges.find(({ opensAt, closesAt }) => currentMinutes >= opensAt && currentMinutes < closesAt)
+  const isGerman = language === 'DE'
+
+  if (activeRange) {
+    return {
+      isOpen: true,
+      detail: isGerman ? `schliesst um ${activeRange.closingTime}` : `ferme à ${activeRange.closingTime}`,
+    }
+  }
+
+  const nextTodayRange = todayRanges.find(({ opensAt }) => currentMinutes < opensAt)
+  if (nextTodayRange) {
+    return {
+      isOpen: false,
+      detail: isGerman ? `öffnet um ${nextTodayRange.openingTime}` : `ouvre à ${nextTodayRange.openingTime}`,
+    }
+  }
+
+  for (let daysAhead = 1; daysAhead <= 7; daysAhead += 1) {
+    const nextDate = new Date(date.getTime() + daysAhead * 24 * 60 * 60 * 1000)
+    const nextWeekday = new Intl.DateTimeFormat('fr-CH', { timeZone: 'Europe/Zurich', weekday: 'long' }).format(nextDate)
+    const nextRange = parseRanges(nextWeekday)[0]
+    if (!nextRange) continue
+    const nextDayName = new Intl.DateTimeFormat(isGerman ? 'de-CH' : 'fr-CH', { timeZone: 'Europe/Zurich', weekday: 'long' }).format(nextDate)
+    return {
+      isOpen: false,
+      detail: isGerman ? `öffnet ${nextDayName} um ${nextRange.openingTime}` : `ouvre ${nextDayName} à ${nextRange.openingTime}`,
+    }
+  }
+
+  return { isOpen: false, detail: isGerman ? 'Öffnungszeiten ansehen' : 'Voir les horaires' }
 }
 
 function formatServicePrice(price) {
@@ -212,7 +246,7 @@ function PublicSite() {
   const [managedServices, setManagedServices] = useState([])
   const [isManagedServicesLoaded, setIsManagedServicesLoaded] = useState(false)
   const [managedBarbers, setManagedBarbers] = useState([])
-  const [isSalonOpen, setIsSalonOpen] = useState(() => isSalonOpenNow(fallbackSalons[0].schedule.FR))
+  const [salonStatus, setSalonStatus] = useState(() => getSalonStatus(fallbackSalons[0].schedule.FR))
   const [bookingOpen, setBookingOpen] = useState(false)
   const [bookingDraft, setBookingDraft] = useState({ salonId: 'bienne', barberId: '', serviceName: '', clientName: '', clientPhone: '+41 ', appointmentDate: '', slotId: '' })
   const [bookingStatus, setBookingStatus] = useState(null)
@@ -231,10 +265,10 @@ function PublicSite() {
   }
 
   useEffect(() => {
-    const updateSalonStatus = () => setIsSalonOpen(isSalonOpenNow(fallbackSalons[0].schedule.FR))
+    const updateSalonStatus = () => setSalonStatus(getSalonStatus(fallbackSalons[0].schedule.FR, language))
     const timer = window.setInterval(updateSalonStatus, 60_000)
     return () => window.clearInterval(timer)
-  }, [])
+  }, [language])
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -696,21 +730,15 @@ function PublicSite() {
           <div className="hero-grid absolute inset-0 -z-10" />
           <div className="relative mx-auto flex w-full max-w-[1440px] items-center">
             <div className="hero-copy relative z-10 max-w-2xl py-12 lg:py-0">
-              <a
-                href="https://www.google.com/maps?cid=4337053876691540753"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-500 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-white shadow-lg shadow-emerald-950/25 transition hover:border-emerald-200 hover:bg-emerald-600"
-                aria-label={language === 'FR' ? 'Voir Alep Salon sur Google Maps' : 'Alep Salon auf Google Maps ansehen'}
-              >
-                <span className={`h-2 w-2 rounded-full ${isSalonOpen ? 'bg-emerald-400' : 'bg-zinc-400'}`} />
-                {isSalonOpen ? (language === 'FR' ? 'Ouvert' : 'Geöffnet') : (language === 'FR' ? 'Fermé' : 'Geschlossen')}
-                <ArrowUpRight size={12} />
-              </a>
+              <div className="mb-10 inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-500 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white shadow-lg shadow-emerald-950/25">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${salonStatus.isOpen ? 'bg-white' : 'bg-zinc-200'}`} />
+                <span>{salonStatus.isOpen ? (language === 'FR' ? 'Ouvert' : 'Geöffnet') : (language === 'FR' ? 'Fermé' : 'Geschlossen')}</span>
+                <span className="font-semibold normal-case tracking-normal">· {salonStatus.detail}</span>
+              </div>
               <h1 data-hero-reveal className="hero-title font-display text-[clamp(5rem,12vw,10rem)] font-black uppercase leading-[0.82] tracking-[-0.075em] text-white">
                 Alep<br />Salon
               </h1>
-              <button data-hero-reveal className="button-primary mt-8 sm:mt-10" onClick={() => handleBooking()}>
+              <button data-hero-reveal className="button-primary mt-14 sm:mt-16" onClick={() => handleBooking()}>
                 {t.heroCta}<ArrowUpRight size={17} />
               </button>
             </div>
