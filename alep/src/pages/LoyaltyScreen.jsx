@@ -244,8 +244,8 @@ export default function LoyaltyScreen() {
     <div className="mx-auto max-w-5xl">
       <header className="flex items-center justify-between border-b border-zinc-800 pb-6">
         <div className="flex min-w-0 items-center gap-4">
-          {needsProfileCompletion && <button type="button" onClick={signOut} className="inline-flex shrink-0 items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-300 transition hover:text-amber-200"><ArrowLeft size={15} /> Précédent</button>}
           <Link to="/" aria-label="Alep Salon — accueil" className="inline-flex items-center transition-opacity hover:opacity-80"><img src="/alep-salon-logo.png" alt="Alep Salon" className="h-12 w-auto max-w-[190px] object-contain" /></Link>
+          {needsProfileCompletion && <button type="button" onClick={signOut} className="inline-flex shrink-0 items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-300 transition hover:text-amber-200"><ArrowLeft size={15} /> Précédent</button>}
         </div>
         {session && profile && !needsProfileCompletion && <button type="button" onClick={signOut} className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition hover:text-amber-200"><LogOut size={14} /> Déconnexion</button>}
       </header>
