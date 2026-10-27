@@ -66,7 +66,7 @@ function BrandLogo({ style }) {
 
 const content = {
   FR: {
-    nav: { salons: 'Le salon', services: 'Services', loyalty: 'Fidélité' },
+    nav: { salons: 'Le salon', services: 'Services', loyalty: 'Fidélité', contact: 'Contact' },
     country: 'Suisse',
     openMenu: 'Ouvrir le menu',
     closeMenu: 'Fermer le menu',
@@ -110,7 +110,7 @@ const content = {
     },
   },
   DE: {
-    nav: { salons: 'Der Salon', services: 'Services', loyalty: 'Treueprogramm' },
+    nav: { salons: 'Der Salon', services: 'Services', loyalty: 'Treueprogramm', contact: 'Kontakt' },
     country: 'Schweiz',
     openMenu: 'Menü öffnen',
     closeMenu: 'Menü schliessen',
@@ -620,6 +620,7 @@ function PublicSite() {
               </div>
             </div>
             <Link className="nav-link" to="/fidelite">{t.nav.loyalty}</Link>
+            <a className="nav-link" href="#salons">{t.nav.contact}</a>
           </nav>
 
           <div className="hidden items-center justify-end gap-4 lg:col-start-3 lg:flex xl:gap-6">
@@ -663,6 +664,7 @@ function PublicSite() {
                 </div>
               </div>
               <Link className="mobile-nav-link" to="/fidelite" onClick={closeMenu}>{t.nav.loyalty}</Link>
+              <a className="mobile-nav-link" href="#salons" onClick={closeMenu}>{t.nav.contact}</a>
               <div className="flex items-center justify-between border-t border-zinc-800 pt-5">
                 <LanguageSwitch language={language} setLanguage={setLanguage} />
                 <button className="button-primary !px-5 !py-3 text-[11px]" onClick={() => { closeMenu(); handleBooking() }}>
