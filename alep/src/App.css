@@ -111,10 +111,6 @@
 .site-footer .text-amber-200,
 .site-footer .text-amber-200\/90 { color: color-mix(in srgb, var(--site-footer-text, #fff) 70%, #d9ad3b); }
 .site-footer a:hover { color: color-mix(in srgb, var(--site-footer-text, #fff) 70%, #d9ad3b); }
-.site-footer .developer-credit .text-white { color: #fff; }
-.site-footer .developer-credit .text-amber-200,
-.site-footer .developer-credit .text-amber-300 { color: #f1cd66; }
-.site-footer .developer-credit { border-color: rgb(217 173 59 / 60%); background: linear-gradient(140deg, rgb(22 59 42 / 96%), rgb(18 25 20 / 98%)); }
 .site-footer .button-primary { border-color: #fff; background: #fff; color: #24543c; }
 .site-footer .button-primary:hover { border-color: #f1f5f2; background: #f1f5f2; color: #24543c; }
 

@@ -9,7 +9,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  MapPin,
   Menu,
   Scissors,
   Star,
@@ -282,20 +281,6 @@ function PublicSite() {
         )
       })
 
-      const developerCredit = document.querySelector('.developer-credit')
-      if (developerCredit) {
-        gsap.fromTo(developerCredit,
-          { y: 18, scale: 0.96, rotateX: 6 },
-          {
-            y: 0,
-            scale: 1,
-            rotateX: 0,
-            duration: 1,
-            ease: 'back.out(1.6)',
-            scrollTrigger: { trigger: developerCredit, start: 'top 92%', toggleActions: 'play reverse play reverse' },
-          },
-        )
-      }
     })
     return () => context.revert()
   }, [introVisible])
@@ -771,9 +756,8 @@ function PublicSite() {
             </a>
             <p className="mt-4 max-w-xs text-xs leading-5 text-zinc-600">{t.footerText}</p>
           </div>
-          <div className="developer-credit mx-auto flex w-full max-w-sm flex-col items-center gap-2 self-center rounded-2xl border border-amber-300/60 bg-zinc-900/70 px-5 py-4 text-center shadow-[0_0_28px_rgba(217,173,59,0.18)] sm:px-6">
-            <span className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.24em] text-amber-300"><MapPin size={13} /> Création locale · Bienne</span>
-            <p className="text-xs leading-5 text-white sm:text-sm">Développé par <strong className="font-bold text-amber-200">un développeur full stack indépendant biennois</strong></p>
+          <div className="mx-auto flex w-full max-w-sm items-center justify-center self-center py-3">
+            <img src="/footer-logo.png" alt="Just Lösung" className="h-auto w-full max-w-[240px] object-contain" />
           </div>
           <div className="flex flex-col gap-3 text-xs text-zinc-500 sm:items-end">
             <div className="flex items-center gap-5 uppercase tracking-[0.16em]"><a href="#top" className="hover:text-zinc-200">{t.legal}</a><a href="#top" className="hover:text-zinc-200">{t.privacy}</a><a href="#top" className="hover:text-zinc-200"><AtSign size={15} /></a></div>
