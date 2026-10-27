@@ -759,7 +759,7 @@ function PublicSite() {
           <div className="mx-auto flex w-full max-w-sm items-center justify-center self-center py-3">
             <div className="flex flex-col items-center">
               <img src="/footer-logo.png" alt="Just Lösung" className="h-auto w-full max-w-[240px] object-contain" />
-              <p className="mt-2 text-center text-xs text-zinc-400">Développé par Just Lösung</p>
+              <p className="mt-2 text-center text-xs text-zinc-400">Développé par</p>
             </div>
           </div>
           <div className="flex flex-col gap-3 text-xs text-zinc-500 sm:items-end">
