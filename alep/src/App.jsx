@@ -1095,7 +1095,7 @@ function RequireAdmin({ children }) {
   const { isLoading, isAdmin } = useAuth()
 
   if (isLoading) return <RouteLoading />
-  if (!isAdmin) return <Navigate to="/" replace />
+  if (!isAdmin) return <Navigate to="/admin-portal" replace />
   return <Suspense fallback={<RouteLoading />}>{children}</Suspense>
 }
 

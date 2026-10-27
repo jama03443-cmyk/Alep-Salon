@@ -15,6 +15,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../auth/useAuth'
 import { BARBER_ASSETS_BUCKET, SERVICE_ASSETS_BUCKET, supabase } from '../supabaseClient'
 import { BODY_COLOR_OPTIONS, BUTTON_COLOR_OPTIONS, FOOTER_COLOR_OPTIONS, LOGO_STYLE_OPTIONS } from '../siteBranding'
 import { DEFAULT_LOYALTY_PROGRAM, getLoyaltyProgramSettings, getLoyaltyProgramSteps } from '../loyaltyProgram'
@@ -59,6 +60,7 @@ function getStorageObjectPath(publicUrl, bucket) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
+  const { refreshAuth } = useAuth()
   const [language, setLanguage] = useState(() => window.localStorage.getItem('alep-admin-language') === 'DE' ? 'DE' : 'FR')
   const [activeTab, setActiveTab] = useState('reservations')
   const [reservations, setReservations] = useState([])
@@ -803,8 +805,13 @@ export default function AdminDashboard() {
   }
 
   const handleSignOut = async () => {
-    await supabase?.auth.signOut()
-    navigate('/', { replace: true })
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      setFeedback({ type: 'error', text: 'La déconnexion a échoué. Réessayez.' })
+      return
+    }
+    await refreshAuth(null)
+    navigate('/admin-portal', { replace: true })
   }
 
   const handleClearReservations = async () => {
