@@ -13,7 +13,6 @@ import {
   Menu,
   Scissors,
   Star,
-  WifiOff,
   X,
 } from 'lucide-react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
@@ -67,7 +66,7 @@ function BrandLogo({ style }) {
 
 const content = {
   FR: {
-    nav: { salons: 'Le salon', services: 'Services', loyalty: 'Fidélité', app: 'Installer l’application' },
+    nav: { salons: 'Le salon', services: 'Services', loyalty: 'Fidélité' },
     country: 'Suisse',
     openMenu: 'Ouvrir le menu',
     closeMenu: 'Fermer le menu',
@@ -88,11 +87,7 @@ const content = {
       '« Enfin un endroit où l’on prend vraiment le temps. Je ressors à chaque fois avec exactement ce que j’avais en tête. »',
     trustAuthor: '— Marc, client depuis 2018',
     giveReview: 'Donner mon avis',
-    appTitle: 'Votre prochaine coupe\nen deux clics.',
-    appText:
-      'Installez Alep Salon sur votre écran d’accueil. Réservez plus vite et consultez les informations du salon même hors connexion.',
     install: 'Installer l’application',
-    offline: 'Disponible hors connexion',
     footerText: 'Le barber shop suisse où chaque détail compte.',
     legal: 'Mentions légales',
     privacy: 'Confidentialité',
@@ -115,7 +110,7 @@ const content = {
     },
   },
   DE: {
-    nav: { salons: 'Der Salon', services: 'Services', loyalty: 'Treueprogramm', app: 'App installieren' },
+    nav: { salons: 'Der Salon', services: 'Services', loyalty: 'Treueprogramm' },
     country: 'Schweiz',
     openMenu: 'Menü öffnen',
     closeMenu: 'Menü schliessen',
@@ -136,11 +131,7 @@ const content = {
       '« Endlich ein Ort, an dem man sich wirklich Zeit nimmt. Ich gehe jedes Mal mit genau dem Ergebnis, das ich mir vorgestellt habe. »',
     trustAuthor: '— Marc, Kunde seit 2018',
     giveReview: 'Bewertung abgeben',
-    appTitle: 'Dein nächster Schnitt\nin zwei Klicks.',
-    appText:
-      'Installiere Alep Salon auf deinem Startbildschirm. Buche schneller und sieh die Saloninformationen auch offline.',
     install: 'App installieren',
-    offline: 'Offline verfügbar',
     footerText: 'Der Schweizer Barber Shop, bei dem jedes Detail zählt.',
     legal: 'Impressum',
     privacy: 'Datenschutz',
@@ -629,7 +620,6 @@ function PublicSite() {
               </div>
             </div>
             <Link className="nav-link" to="/fidelite">{t.nav.loyalty}</Link>
-            <a className="nav-link" href="#app">{t.nav.app}</a>
           </nav>
 
           <div className="hidden items-center justify-end gap-4 lg:col-start-3 lg:flex xl:gap-6">
@@ -673,7 +663,6 @@ function PublicSite() {
                 </div>
               </div>
               <Link className="mobile-nav-link" to="/fidelite" onClick={closeMenu}>{t.nav.loyalty}</Link>
-              <a className="mobile-nav-link" href="#app" onClick={closeMenu}>{t.nav.app}</a>
               <div className="flex items-center justify-between border-t border-zinc-800 pt-5">
                 <LanguageSwitch language={language} setLanguage={setLanguage} />
                 <button className="button-primary !px-5 !py-3 text-[11px]" onClick={() => { closeMenu(); handleBooking() }}>
@@ -733,21 +722,6 @@ function PublicSite() {
             </div>
             <div className="space-y-12">
               {serviceCategories.map((category) => <ServiceCategory key={category.title} title={category.title} items={category.items} onBook={handleBooking} bookLabel={t.bookThis} />)}
-            </div>
-          </div>
-        </section>
-
-        <section id="app" className="px-5 pb-20 sm:px-8 lg:px-10 lg:pb-28" data-scroll-reveal>
-          <div className="relative isolate mx-auto max-w-[1280px] overflow-hidden border border-zinc-700/80 bg-zinc-900 px-6 py-12 sm:px-12 sm:py-16 lg:px-20 lg:py-20">
-            <div className="absolute -right-16 -top-28 -z-10 h-80 w-80 rounded-full border border-amber-100/10 bg-amber-100/[0.03] blur-sm" />
-            <div className="absolute bottom-0 right-0 -z-10 h-full w-1/2 bg-[radial-gradient(ellipse_at_center,rgba(173,133,51,0.14),transparent_65%)]" />
-            <div className="max-w-2xl">
-              <h2 className="section-title whitespace-pre-line">{t.appTitle}</h2>
-              <p className="mt-6 max-w-lg text-sm leading-7 text-zinc-400" style={{ color: '#000' }}>{t.appText}</p>
-              <div className="mt-8 flex flex-col gap-5 sm:flex-row sm:items-center">
-                <button className="button-primary" onClick={handleInstall}><Download size={17} />{t.install}</button>
-                <div className="flex items-center gap-2 text-xs text-zinc-500" style={{ color: '#000' }}><WifiOff size={15} className="text-amber-200" style={{ color: '#000' }} />{t.offline}</div>
-              </div>
             </div>
           </div>
         </section>
