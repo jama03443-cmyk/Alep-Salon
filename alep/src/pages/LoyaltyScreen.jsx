@@ -48,11 +48,15 @@ export default function LoyaltyScreen() {
   const [loyaltySteps, setLoyaltySteps] = useState(() => getLoyaltyProgramSteps(DEFAULT_LOYALTY_PROGRAM))
   const [isLoadingLoyaltyData, setIsLoadingLoyaltyData] = useState(false)
   const [loyaltyLoadAttempt, setLoyaltyLoadAttempt] = useState(0)
+  const [isLoyaltyProgramLoaded, setIsLoyaltyProgramLoaded] = useState(false)
   const [showRewardCelebration, setShowRewardCelebration] = useState(false)
-  const previousPoints = useRef(null)
+  const rewardClaimInFlight = useRef(false)
 
   useEffect(() => {
-    if (!supabase) return undefined
+    if (!supabase) {
+      setIsLoyaltyProgramLoaded(true)
+      return undefined
+    }
     let mounted = true
     const loadLoyaltyProgram = async () => {
       const { data, error } = await supabase
@@ -64,6 +68,7 @@ export default function LoyaltyScreen() {
         setLoyaltyProgram(getLoyaltyProgramSettings(data))
         setLoyaltySteps(getLoyaltyProgramSteps(data))
       }
+      if (mounted) setIsLoyaltyProgramLoaded(true)
     }
     void loadLoyaltyProgram()
     return () => { mounted = false }
@@ -97,20 +102,33 @@ export default function LoyaltyScreen() {
   }, [toast])
 
   useEffect(() => {
-    if (!card) {
-      previousPoints.current = null
-      return
-    }
-
+    if (!card || !isLoyaltyProgramLoaded || !supabase || rewardClaimInFlight.current) return undefined
     const pointsNow = Number(card.points) || 0
     const pointsForReward = Math.max(1, (Number(loyaltyProgram.loyalty_visits_for_reward) || 10) - 1)
-    const pointsBefore = previousPoints.current
-    previousPoints.current = pointsNow
+    if (pointsNow < pointsForReward) return undefined
 
-    if (pointsBefore !== null && pointsBefore < pointsForReward && pointsNow >= pointsForReward) {
-      setShowRewardCelebration(true)
+    rewardClaimInFlight.current = true
+    const claimReward = async () => {
+      try {
+        const { data, error } = await supabase.rpc('claim_loyalty_reward')
+        if (error) {
+          setErrorMessage('Votre coupe est acquise, mais la remise à zéro automatique nécessite la migration Supabase de la récompense fidélité.')
+          return
+        }
+        const updatedCard = Array.isArray(data) ? data[0] : data
+        if (updatedCard) setCard(updatedCard)
+        await refreshLoyaltyData()
+        setShowRewardCelebration(true)
+      } catch {
+        setErrorMessage('Votre coupe est acquise, mais le compteur n’a pas pu être remis à zéro. Réessayez avec une connexion active.')
+      } finally {
+        rewardClaimInFlight.current = false
+      }
     }
-  }, [card?.points, loyaltyProgram.loyalty_visits_for_reward])
+
+    void claimReward()
+    return undefined
+  }, [card?.points, isLoyaltyProgramLoaded, loyaltyProgram.loyalty_visits_for_reward, refreshLoyaltyData])
 
   useEffect(() => {
     if (!session || !supabase) {

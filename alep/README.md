@@ -29,14 +29,17 @@ Exécutez les migrations dans cet ordre depuis le SQL Editor du projet Supabase 
 
 1. `schema.sql`
 2. `loyalty-migration.sql`
-3. `availability-migration.sql`
-4. `barbers-availability-migration.sql`
-5. `reservation-status-migration.sql`
-6. `instant-booking-migration.sql`
-7. `booking-time-validation-migration.sql`
-8. `service-images-migration.sql`
-9. `hero-image-migration.sql`
-10. `clear-client-records-migration.sql` (nécessaire au bouton de suppression et au nettoyage automatique après sept jours)
+3. `loyalty-program-settings-migration.sql`
+4. `loyalty-steps-migration.sql`
+5. `loyalty-reward-auto-reset-migration.sql`
+6. `availability-migration.sql`
+7. `barbers-availability-migration.sql`
+8. `reservation-status-migration.sql`
+9. `instant-booking-migration.sql`
+10. `booking-time-validation-migration.sql`
+11. `service-images-migration.sql`
+12. `hero-image-migration.sql`
+13. `clear-client-records-migration.sql` (nécessaire au bouton de suppression et au nettoyage automatique après sept jours)
 
 Créez ensuite un compte dans Supabase Auth, puis attribuez-lui le rôle admin avec son UUID :
 
