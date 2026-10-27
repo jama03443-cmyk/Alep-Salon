@@ -24,6 +24,34 @@ function swissWhatsApp(value) {
   return digits.length === 9 ? `+41${digits}` : null
 }
 
+function getGooglePrefill(session, profile) {
+  const metadata = session?.user?.user_metadata ?? {}
+  const fullName = profile?.full_name || metadata.full_name || metadata.name || ''
+  const nameParts = fullName.trim().split(/\s+/).filter(Boolean)
+  const firstName = profile?.first_name || metadata.given_name || metadata.first_name || nameParts[0] || ''
+  const lastName = profile?.last_name || metadata.family_name || metadata.last_name || nameParts.slice(1).join(' ')
+  const phoneNumbers = Array.isArray(metadata.phoneNumbers) ? metadata.phoneNumbers : []
+  const phone = profile?.whatsapp
+    || profile?.phone
+    || session?.user?.phone
+    || metadata.whatsapp
+    || metadata.phone_number
+    || metadata.phone
+    || phoneNumbers[0]?.value
+    || ''
+  const phoneDigits = String(phone).replace(/\D/g, '')
+  const isSwissPhone = phoneDigits.length === 9
+    || (phoneDigits.length === 10 && phoneDigits.startsWith('0'))
+    || ((phoneDigits.length === 11 && phoneDigits.startsWith('41')))
+    || (phoneDigits.length === 13 && phoneDigits.startsWith('0041'))
+
+  return {
+    firstName,
+    lastName,
+    whatsapp: isSwissPhone ? swissPhoneDigits(phone) : '',
+  }
+}
+
 export default function LoyaltyScreen() {
   const { session, isLoading, refreshAuth } = useAuth()
   const location = useLocation()
@@ -103,17 +131,18 @@ export default function LoyaltyScreen() {
       try {
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('first_name, last_name, whatsapp')
+          .select('first_name, last_name, whatsapp, phone, full_name')
           .eq('id', session.user.id)
           .maybeSingle()
         if (!mounted) return
         if (profileError) throw new Error('Votre profil ne peut pas être chargé. Vérifiez la connexion Supabase puis réessayez.')
 
         const currentProfile = profileData ?? { first_name: '', last_name: '', whatsapp: '' }
+        const googlePrefill = getGooglePrefill(session, currentProfile)
         setProfile(currentProfile)
-        setFirstName(currentProfile.first_name ?? '')
-        setLastName(currentProfile.last_name ?? '')
-        setWhatsappInput(swissPhoneDigits(currentProfile.whatsapp ?? ''))
+        setFirstName(googlePrefill.firstName)
+        setLastName(googlePrefill.lastName)
+        setWhatsappInput(googlePrefill.whatsapp)
 
         const { data, error } = await supabase
           .from('loyalty_cards')
@@ -190,6 +219,7 @@ export default function LoyaltyScreen() {
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/fidelite`,
+          scopes: 'openid email profile',
           queryParams: { prompt: 'select_account' },
         },
       })
@@ -278,7 +308,7 @@ export default function LoyaltyScreen() {
   </main>
 }
 
-function ProfileCompletion({ firstName, lastName, whatsappInput, setFirstName, setLastName, setWhatsappInput, onSubmit, isSubmitting, errorMessage }) { return <section className="mx-auto mt-14 max-w-xl border border-zinc-800 bg-zinc-900/50 p-6 sm:p-8"><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-200"><UserRound size={14} /> Première connexion</p><h1 className="mt-4 font-display text-4xl font-bold uppercase leading-none tracking-tight">Finalisez votre carte.</h1><p className="mt-3 text-sm leading-6 text-zinc-500">Votre compte Google est connecté. Ces informations permettent à l’équipe Alep de vous identifier et de vous joindre si nécessaire.</p><form className="mt-7 space-y-5" onSubmit={onSubmit}><label className="block"><span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Prénom</span><input required value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" className="loyalty-input" placeholder="Votre prénom" /></label><label className="block"><span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Nom</span><input required value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="family-name" className="loyalty-input" placeholder="Votre nom" /></label><WhatsAppField value={whatsappInput} onChange={setWhatsappInput} />{errorMessage && <InlineError>{errorMessage}</InlineError>}<button type="submit" className="button-primary w-full" disabled={isSubmitting}>{isSubmitting ? 'Activation…' : 'Activer ma carte'}</button></form></section> }
+function ProfileCompletion({ firstName, lastName, whatsappInput, setFirstName, setLastName, setWhatsappInput, onSubmit, isSubmitting, errorMessage }) { return <section className="mx-auto mt-14 max-w-xl border border-zinc-800 bg-zinc-900/50 p-6 sm:p-8"><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-200"><UserRound size={14} /> Première connexion</p><h1 className="mt-4 font-display text-4xl font-bold uppercase leading-none tracking-tight">Finalisez votre carte.</h1><p className="mt-3 text-sm leading-6 text-zinc-500">Les informations disponibles de votre compte Google sont préremplies. Vérifiez votre nom et ajoutez votre numéro WhatsApp s’il manque.</p><form className="mt-7 space-y-5" onSubmit={onSubmit}><label className="block"><span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Prénom</span><input required value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" className="loyalty-input" placeholder="Votre prénom" /></label><label className="block"><span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Nom</span><input required value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="family-name" className="loyalty-input" placeholder="Votre nom" /></label><WhatsAppField value={whatsappInput} onChange={setWhatsappInput} />{errorMessage && <InlineError>{errorMessage}</InlineError>}<button type="submit" className="button-primary w-full" disabled={isSubmitting}>{isSubmitting ? 'Activation…' : 'Activer ma carte'}</button></form></section> }
 function WhatsAppField({ value, onChange }) { return <label className="block"><span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Numéro WhatsApp suisse</span><span className="flex h-12 border border-zinc-700 bg-zinc-950 focus-within:border-amber-200"><span className="flex items-center border-r border-zinc-700 px-4 font-mono text-sm text-amber-200">+41</span><input inputMode="tel" autoComplete="tel-national" value={value} onChange={(event) => onChange(swissPhoneDigits(event.target.value))} required className="min-w-0 flex-1 bg-transparent px-4 text-sm text-zinc-100 outline-none" placeholder="79 123 45 67" /></span><span className="mt-2 block text-[10px] leading-4 text-zinc-600">Entrez 79 123 45 67, 079 123 45 67 ou +41 79 123 45 67.</span></label> }
 function LoyaltyCard({ card, events, copied, onCopy, rewardVisits }) { if (!card) return <LoadingScreen />; const qrValue = `ALEP-LOYALTY:${card.member_code}`; const pointsForReward = Math.max(1, (Number(rewardVisits) || 10) - 1); const pointsRemaining = Math.max(0, pointsForReward - Number(card.points || 0)); return <section className="mx-auto mt-12 max-w-3xl"><p className="text-center text-[10px] font-bold uppercase tracking-[0.24em] text-amber-200">Votre carte fidélité</p><h1 className="mt-4 text-center font-display text-5xl font-bold uppercase leading-none tracking-tight sm:text-6xl">Bienvenue dans le club.</h1><div className="mt-9 overflow-hidden border border-amber-200/30 bg-[radial-gradient(circle_at_90%_0%,rgba(253,230,138,0.17),transparent_35%),linear-gradient(135deg,#18181b,#09090b)] p-6 sm:p-10"><div className="flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-baseline gap-3"><span className="font-display text-8xl font-bold leading-none text-amber-200">{card.points}</span><span className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">points collectés</span></div><p className="mt-5 text-sm text-zinc-400">Présentez votre code QR à l’équipe pour ajouter vos points à chaque visite.</p><p className="mt-2 text-xs text-zinc-600">Membre depuis {formatMemberSince(card.downloaded_at)}</p></div><div className="shrink-0 bg-zinc-50 p-3"><QRCodeSVG value={qrValue} size={168} level="M" includeMargin /></div></div><div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between"><span className="break-all font-mono text-xs text-zinc-500">{card.member_code}</span><button type="button" onClick={onCopy} className="inline-flex items-center gap-2 self-start text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-300 transition hover:text-amber-200"><Copy size={14} />{copied ? 'Code copié' : 'Copier le code'}</button></div></div><p className="mt-4 text-center text-sm font-semibold text-amber-200">{pointsRemaining === 0 ? 'Votre coupe offerte vous attend.' : `Encore ${pointsRemaining} point${pointsRemaining === 1 ? '' : 's'} avant votre coupe offerte.`}</p><div className="mt-6 flex items-center justify-center gap-2 text-xs text-zinc-500"><Gift size={15} className="text-amber-200" /> Vos points sont ajoutés à votre carte numérique par l’équipe après chaque visite.</div><HistoryList events={events} /></section> }
 function HistoryList({ events }) { return <section className="mt-10 border border-zinc-800 bg-zinc-900/35"><div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4 sm:px-6"><h2 className="flex items-center gap-2 font-display text-2xl font-bold uppercase tracking-tight"><History size={19} className="text-amber-200" /> Historique des points</h2><span className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{events.length} opération{events.length === 1 ? '' : 's'}</span></div>{events.length === 0 ? <p className="px-5 py-10 text-center text-sm text-zinc-500">Aucun point n’a encore été collecté. Présentez votre QR code lors de votre prochaine visite.</p> : <ul className="divide-y divide-zinc-800">{events.map((event) => <PointEvent key={event.id} event={event} />)}</ul>}</section> }
