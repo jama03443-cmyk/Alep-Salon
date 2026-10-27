@@ -700,7 +700,7 @@ function PublicSite() {
                 href="https://www.google.com/maps?cid=4337053876691540753"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-sm transition hover:border-amber-200/70 hover:bg-black/60"
+                className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-500 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-white shadow-lg shadow-emerald-950/25 transition hover:border-emerald-200 hover:bg-emerald-600"
                 aria-label={language === 'FR' ? 'Voir Alep Salon sur Google Maps' : 'Alep Salon auf Google Maps ansehen'}
               >
                 <span className={`h-2 w-2 rounded-full ${isSalonOpen ? 'bg-emerald-400' : 'bg-zinc-400'}`} />
