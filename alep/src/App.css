@@ -2,7 +2,7 @@
 
 /* Bright ivory-and-gold theme for the public salon site. */
 .site-shell {
-  color: #201d17;
+  color: var(--site-body-text, #201d17);
   background: var(--site-body-color, #fff);
 }
 
@@ -18,15 +18,15 @@
 .site-shell .text-zinc-100,
 .site-shell .text-zinc-200,
 .site-shell .text-zinc-300,
-.site-shell .text-zinc-50 { color: #252117; }
+.site-shell .text-zinc-50 { color: var(--site-body-text, #252117); }
 .site-shell .text-zinc-400,
 .site-shell .text-zinc-500,
-.site-shell .text-zinc-600 { color: #706b60; }
+.site-shell .text-zinc-600 { color: color-mix(in srgb, var(--site-body-text, #201d17) 72%, transparent); }
 .site-shell #app .text-zinc-400,
-.site-shell #app .text-zinc-500 { color: #000; }
+.site-shell #app .text-zinc-500 { color: var(--site-body-text, #000); }
 .site-shell .text-amber-200,
 .site-shell .text-amber-200\/90 { color: #98721b; }
-.site-shell .section-title { color: #201d17; }
+.site-shell .section-title { color: var(--site-body-text, #201d17); }
 .site-shell #top h1 { color: #fff; }
 .site-shell #top .text-zinc-300,
 .site-shell #top .text-zinc-400,
@@ -82,12 +82,12 @@
 
 .site-shell .button-ghost {
   border-color: #c9b77e;
-  color: #463817;
+  color: var(--site-body-text, #463817);
 }
 
 .site-shell .button-ghost:hover {
-  border-color: #b8871f;
-  background: #faf4e2;
+  border-color: color-mix(in srgb, var(--site-body-text, #201d17) 45%, transparent);
+  background: color-mix(in srgb, var(--site-body-text, #201d17) 10%, transparent);
 }
 
 .site-footer {

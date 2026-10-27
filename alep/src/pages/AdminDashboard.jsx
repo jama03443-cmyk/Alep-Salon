@@ -17,6 +17,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { BARBER_ASSETS_BUCKET, SERVICE_ASSETS_BUCKET, supabase } from '../supabaseClient'
 import { BODY_COLOR_OPTIONS, BUTTON_COLOR_OPTIONS, FOOTER_COLOR_OPTIONS, LOGO_STYLE_OPTIONS } from '../siteBranding'
+import { DEFAULT_LOYALTY_PROGRAM, getLoyaltyProgramSettings, LOYALTY_PROGRAM_CARDS } from '../loyaltyProgram'
 
 const salonNames = {
   bienne: 'Bienne',
@@ -70,6 +71,7 @@ export default function AdminDashboard() {
   const [siteFooterColor, setSiteFooterColor] = useState(FOOTER_COLOR_OPTIONS[0].value)
   const [siteButtonColor, setSiteButtonColor] = useState(BUTTON_COLOR_OPTIONS[0].value)
   const [siteLogoStyle, setSiteLogoStyle] = useState('classic')
+  const [loyaltyProgram, setLoyaltyProgram] = useState(DEFAULT_LOYALTY_PROGRAM)
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingService, setIsSavingService] = useState(false)
   const [serviceImageUploadId, setServiceImageUploadId] = useState(null)
@@ -160,7 +162,7 @@ export default function AdminDashboard() {
         .order('appointment_date')
         .order('appointment_time'),
       supabase.from('barbers').select('id, salon_id, name, image_url, is_active').order('name'),
-      supabase.from('site_settings').select('hero_image_url, body_color, footer_color, button_color, logo_style').eq('id', true).maybeSingle(),
+      supabase.from('site_settings').select('hero_image_url, body_color, footer_color, button_color, logo_style, loyalty_visits_for_reward, loyalty_reward_title, loyalty_reward_description, loyalty_birthday_title, loyalty_birthday_description, loyalty_referral_title, loyalty_referral_description, loyalty_review_title, loyalty_review_description').eq('id', true).maybeSingle(),
     ])
 
     const firstError = reservationsResult.error || servicesResult.error || loyaltyResult.error || availabilityResult.error || barbersResult.error
@@ -178,6 +180,7 @@ export default function AdminDashboard() {
         setSiteFooterColor(heroSettingsResult.data?.footer_color ?? FOOTER_COLOR_OPTIONS[0].value)
         setSiteButtonColor(heroSettingsResult.data?.button_color ?? BUTTON_COLOR_OPTIONS[0].value)
         setSiteLogoStyle(heroSettingsResult.data?.logo_style ?? 'classic')
+        setLoyaltyProgram(getLoyaltyProgramSettings(heroSettingsResult.data))
       }
     }
     setIsLoading(false)
@@ -776,15 +779,20 @@ export default function AdminDashboard() {
 
   const handleSaveBranding = async () => {
     if (!supabase || isSavingBranding) return
+    const rewardVisits = Number(loyaltyProgram.loyalty_visits_for_reward)
+    if (!Number.isInteger(rewardVisits) || rewardVisits < 2 || rewardVisits > 100) {
+      setFeedback({ type: 'error', text: 'Le nombre de coupes avant la récompense doit être compris entre 2 et 100.' })
+      return
+    }
     setIsSavingBranding(true)
     setFeedback(null)
     const { error } = await supabase
       .from('site_settings')
-      .update({ body_color: siteBodyColor, footer_color: siteFooterColor, button_color: siteButtonColor, logo_style: siteLogoStyle })
+      .update({ body_color: siteBodyColor, footer_color: siteFooterColor, button_color: siteButtonColor, logo_style: siteLogoStyle, ...loyaltyProgram, loyalty_visits_for_reward: rewardVisits })
       .eq('id', true)
 
     if (error) {
-      setFeedback({ type: 'error', text: 'Impossible d’enregistrer le design. Exécutez la migration hero-image-migration.sql.' })
+      setFeedback({ type: 'error', text: 'Impossible d’enregistrer les réglages. Vérifiez que hero-image-migration.sql et loyalty-program-settings-migration.sql ont été exécutés dans Supabase.' })
     } else {
       setFeedback({ type: 'success', text: 'Les couleurs et le logo ont été enregistrés.' })
       await loadDashboard()
@@ -1058,6 +1066,31 @@ export default function AdminDashboard() {
                 </section>
                 <button type="button" className="button-primary w-full" onClick={() => void handleSaveBranding()} disabled={isSavingBranding}><Check size={16} />{isSavingBranding ? 'Enregistrement…' : 'Enregistrer le design'}</button>
               </div>
+            </article>
+
+            <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8 xl:col-span-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Programme de fidélité</p>
+              <h2 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Comment ça marche</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">Le seuil et les textes ci-dessous seront affichés sur la page fidélité des clients. Utilisez {`{visits}`} pour afficher le nombre de coupes et {`{points}`} pour les points nécessaires avant la récompense.</p>
+              <div className="mt-7 max-w-sm">
+                <DashboardField label="Nombre de coupes avant la récompense">
+                  <input required type="number" min="2" max="100" value={loyaltyProgram.loyalty_visits_for_reward} onChange={(event) => setLoyaltyProgram((current) => ({ ...current, loyalty_visits_for_reward: event.target.value }))} className="dashboard-input" />
+                </DashboardField>
+              </div>
+              <div className="mt-6 grid gap-5 md:grid-cols-2">
+                {LOYALTY_PROGRAM_CARDS.map(({ titleKey, descriptionKey }, index) => (
+                  <section key={titleKey} className="space-y-4 border border-zinc-800 p-5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">Étape {index + 1}</p>
+                    <DashboardField label="Titre">
+                      <input maxLength="80" value={loyaltyProgram[titleKey]} onChange={(event) => setLoyaltyProgram((current) => ({ ...current, [titleKey]: event.target.value }))} className="dashboard-input" />
+                    </DashboardField>
+                    <DashboardField label="Explication">
+                      <textarea maxLength="500" rows="3" value={loyaltyProgram[descriptionKey]} onChange={(event) => setLoyaltyProgram((current) => ({ ...current, [descriptionKey]: event.target.value }))} className="dashboard-input resize-y" />
+                    </DashboardField>
+                  </section>
+                ))}
+              </div>
+              <button type="button" className="button-primary mt-6 w-full" onClick={() => void handleSaveBranding()} disabled={isSavingBranding}><Check size={16} />{isSavingBranding ? 'Enregistrement…' : 'Enregistrer le programme de fidélité'}</button>
             </article>
           </section>
         )}

@@ -18,7 +18,7 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react
 import { AuthProvider } from './auth/AuthContext'
 import { useAuth } from './auth/useAuth'
 import { isSupabaseConfigured, supabase } from './supabaseClient'
-import { BODY_COLOR_OPTIONS, BUTTON_COLOR_OPTIONS, FOOTER_COLOR_OPTIONS, getButtonTextColor } from './siteBranding'
+import { BODY_COLOR_OPTIONS, BUTTON_COLOR_OPTIONS, FOOTER_COLOR_OPTIONS, getButtonTextColor, getContrastTextColor } from './siteBranding'
 import './App.css'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -209,6 +209,7 @@ function PublicSite() {
   const t = content[language]
   const siteStyle = {
     '--site-body-color': managedBranding.body_color || BODY_COLOR_OPTIONS[0].value,
+    '--site-body-text': getContrastTextColor(managedBranding.body_color || BODY_COLOR_OPTIONS[0].value),
     '--site-footer-color': managedBranding.footer_color || FOOTER_COLOR_OPTIONS[0].value,
     '--site-footer-text': getButtonTextColor(managedBranding.footer_color || FOOTER_COLOR_OPTIONS[0].value),
     '--site-button-color': managedBranding.button_color || BUTTON_COLOR_OPTIONS[0].value,

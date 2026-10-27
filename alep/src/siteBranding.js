@@ -5,6 +5,8 @@ export const BODY_COLOR_OPTIONS = [
   { value: '#f1e9ed', label: 'Rose clair', color: '#f1e9ed' },
   { value: '#e6f7f7', label: 'Turquoise clair', color: '#e6f7f7' },
   { value: '#fbe9e7', label: 'Rouge suisse clair', color: '#fbe9e7' },
+  { value: '#0f8b8d', label: 'Bleu turquoise', color: '#0f8b8d' },
+  { value: '#da291c', label: 'Rouge suisse', color: '#da291c' },
 ]
 
 export const FOOTER_COLOR_OPTIONS = [
@@ -42,4 +44,16 @@ export function getButtonTextColor(hexColor) {
     .reduce((total, value, index) => total + value * [0.2126, 0.7152, 0.0722][index], 0)
 
   return luminance > 0.48 ? '#201a0b' : '#ffffff'
+}
+
+export function getContrastTextColor(hexColor) {
+  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hexColor ?? '')
+  if (!match) return '#201d17'
+
+  const channels = match.slice(1).map((value) => parseInt(value, 16) / 255)
+  const luminance = channels
+    .map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4))
+    .reduce((total, value, index) => total + value * [0.2126, 0.7152, 0.0722][index], 0)
+
+  return luminance > 0.179 ? '#000000' : '#ffffff'
 }
