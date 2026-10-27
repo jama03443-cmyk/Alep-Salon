@@ -17,7 +17,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { BARBER_ASSETS_BUCKET, SERVICE_ASSETS_BUCKET, supabase } from '../supabaseClient'
 import { BODY_COLOR_OPTIONS, BUTTON_COLOR_OPTIONS, FOOTER_COLOR_OPTIONS, LOGO_STYLE_OPTIONS } from '../siteBranding'
-import { DEFAULT_LOYALTY_PROGRAM, getLoyaltyProgramSettings, LOYALTY_PROGRAM_CARDS } from '../loyaltyProgram'
+import { DEFAULT_LOYALTY_PROGRAM, getLoyaltyProgramSettings, getLoyaltyProgramSteps } from '../loyaltyProgram'
 
 const salonNames = {
   bienne: 'Bienne',
@@ -72,6 +72,7 @@ export default function AdminDashboard() {
   const [siteButtonColor, setSiteButtonColor] = useState(BUTTON_COLOR_OPTIONS[0].value)
   const [siteLogoStyle, setSiteLogoStyle] = useState('classic')
   const [loyaltyProgram, setLoyaltyProgram] = useState(DEFAULT_LOYALTY_PROGRAM)
+  const [loyaltySteps, setLoyaltySteps] = useState(() => getLoyaltyProgramSteps(DEFAULT_LOYALTY_PROGRAM))
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingService, setIsSavingService] = useState(false)
   const [serviceImageUploadId, setServiceImageUploadId] = useState(null)
@@ -162,7 +163,7 @@ export default function AdminDashboard() {
         .order('appointment_date')
         .order('appointment_time'),
       supabase.from('barbers').select('id, salon_id, name, image_url, is_active').order('name'),
-      supabase.from('site_settings').select('hero_image_url, body_color, footer_color, button_color, logo_style, loyalty_visits_for_reward, loyalty_reward_title, loyalty_reward_description, loyalty_birthday_title, loyalty_birthday_description, loyalty_referral_title, loyalty_referral_description, loyalty_review_title, loyalty_review_description').eq('id', true).maybeSingle(),
+      supabase.from('site_settings').select('hero_image_url, body_color, footer_color, button_color, logo_style, loyalty_visits_for_reward, loyalty_reward_title, loyalty_reward_description, loyalty_birthday_title, loyalty_birthday_description, loyalty_referral_title, loyalty_referral_description, loyalty_review_title, loyalty_review_description, loyalty_steps').eq('id', true).maybeSingle(),
     ])
 
     const firstError = reservationsResult.error || servicesResult.error || loyaltyResult.error || availabilityResult.error || barbersResult.error
@@ -181,6 +182,7 @@ export default function AdminDashboard() {
         setSiteButtonColor(heroSettingsResult.data?.button_color ?? BUTTON_COLOR_OPTIONS[0].value)
         setSiteLogoStyle(heroSettingsResult.data?.logo_style ?? 'classic')
         setLoyaltyProgram(getLoyaltyProgramSettings(heroSettingsResult.data))
+        setLoyaltySteps(getLoyaltyProgramSteps(heroSettingsResult.data))
       }
     }
     setIsLoading(false)
@@ -788,11 +790,11 @@ export default function AdminDashboard() {
     setFeedback(null)
     const { error } = await supabase
       .from('site_settings')
-      .update({ body_color: siteBodyColor, footer_color: siteFooterColor, button_color: siteButtonColor, logo_style: siteLogoStyle, ...loyaltyProgram, loyalty_visits_for_reward: rewardVisits })
+      .update({ body_color: siteBodyColor, footer_color: siteFooterColor, button_color: siteButtonColor, logo_style: siteLogoStyle, ...loyaltyProgram, loyalty_visits_for_reward: rewardVisits, loyalty_steps: loyaltySteps })
       .eq('id', true)
 
     if (error) {
-      setFeedback({ type: 'error', text: 'Impossible d’enregistrer les réglages. Vérifiez que hero-image-migration.sql et loyalty-program-settings-migration.sql ont été exécutés dans Supabase.' })
+      setFeedback({ type: 'error', text: 'Impossible d’enregistrer les réglages. Vérifiez que hero-image-migration.sql, loyalty-program-settings-migration.sql et loyalty-steps-migration.sql ont été exécutés dans Supabase.' })
     } else {
       setFeedback({ type: 'success', text: 'Les couleurs et le logo ont été enregistrés.' })
       await loadDashboard()
@@ -1078,18 +1080,22 @@ export default function AdminDashboard() {
                 </DashboardField>
               </div>
               <div className="mt-6 grid gap-5 md:grid-cols-2">
-                {LOYALTY_PROGRAM_CARDS.map(({ titleKey, descriptionKey }, index) => (
-                  <section key={titleKey} className="space-y-4 border border-zinc-800 p-5">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">Étape {index + 1}</p>
+                {loyaltySteps.map((step, index) => (
+                  <section key={step.id} className="space-y-4 border border-zinc-800 p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">Étape {index + 1}</p>
+                      <button type="button" onClick={() => setLoyaltySteps((current) => current.filter((item) => item.id !== step.id))} aria-label={`Supprimer l’étape ${index + 1}`} title="Supprimer cette étape" className="rounded-full border border-red-900/70 p-2 text-red-300 transition hover:border-red-500 hover:text-red-100"><Trash2 size={14} /></button>
+                    </div>
                     <DashboardField label="Titre">
-                      <input maxLength="80" value={loyaltyProgram[titleKey]} onChange={(event) => setLoyaltyProgram((current) => ({ ...current, [titleKey]: event.target.value }))} className="dashboard-input" />
+                      <input maxLength="80" value={step.title} onChange={(event) => setLoyaltySteps((current) => current.map((item) => item.id === step.id ? { ...item, title: event.target.value } : item))} className="dashboard-input" />
                     </DashboardField>
                     <DashboardField label="Explication">
-                      <textarea maxLength="500" rows="3" value={loyaltyProgram[descriptionKey]} onChange={(event) => setLoyaltyProgram((current) => ({ ...current, [descriptionKey]: event.target.value }))} className="dashboard-input resize-y" />
+                      <textarea maxLength="500" rows="3" value={step.description} onChange={(event) => setLoyaltySteps((current) => current.map((item) => item.id === step.id ? { ...item, description: event.target.value } : item))} className="dashboard-input resize-y" />
                     </DashboardField>
                   </section>
                 ))}
               </div>
+              <button type="button" className="button-ghost mt-5 w-full justify-center" onClick={() => setLoyaltySteps((current) => [...current, { id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, title: 'Nouvelle étape', description: 'Décrivez cette étape du programme de fidélité.', icon: 'sparkles' }])}><Plus size={16} />Ajouter une étape</button>
               <button type="button" className="button-primary mt-6 w-full" onClick={() => void handleSaveBranding()} disabled={isSavingBranding}><Check size={16} />{isSavingBranding ? 'Enregistrement…' : 'Enregistrer le programme de fidélité'}</button>
             </article>
           </section>

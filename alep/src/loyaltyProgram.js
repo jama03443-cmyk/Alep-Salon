@@ -11,11 +11,29 @@ export const DEFAULT_LOYALTY_PROGRAM = {
 }
 
 export const LOYALTY_PROGRAM_CARDS = [
-  { titleKey: 'loyalty_reward_title', descriptionKey: 'loyalty_reward_description', icon: 'scissors' },
-  { titleKey: 'loyalty_birthday_title', descriptionKey: 'loyalty_birthday_description', icon: 'gift' },
-  { titleKey: 'loyalty_referral_title', descriptionKey: 'loyalty_referral_description', icon: 'friends' },
-  { titleKey: 'loyalty_review_title', descriptionKey: 'loyalty_review_description', icon: 'star' },
+  { id: 'reward', titleKey: 'loyalty_reward_title', descriptionKey: 'loyalty_reward_description', icon: 'scissors' },
+  { id: 'birthday', titleKey: 'loyalty_birthday_title', descriptionKey: 'loyalty_birthday_description', icon: 'gift' },
+  { id: 'referral', titleKey: 'loyalty_referral_title', descriptionKey: 'loyalty_referral_description', icon: 'friends' },
+  { id: 'review', titleKey: 'loyalty_review_title', descriptionKey: 'loyalty_review_description', icon: 'star' },
 ]
+
+export function getLoyaltyProgramSteps(data = {}) {
+  if (Array.isArray(data.loyalty_steps)) {
+    return data.loyalty_steps.map((step, index) => ({
+      id: String(step.id ?? `step-${index + 1}`),
+      title: String(step.title ?? ''),
+      description: String(step.description ?? ''),
+      icon: String(step.icon ?? 'sparkles'),
+    }))
+  }
+
+  return LOYALTY_PROGRAM_CARDS.map(({ id, titleKey, descriptionKey, icon }) => ({
+    id,
+    title: data[titleKey] ?? DEFAULT_LOYALTY_PROGRAM[titleKey],
+    description: data[descriptionKey] ?? DEFAULT_LOYALTY_PROGRAM[descriptionKey],
+    icon,
+  }))
+}
 
 const OLD_REWARD_DESCRIPTIONS = [
   'À chaque visite avec une coupe, l’équipe ajoute un tampon. Lorsque {stamps} tampons sont réunis, la coupe suivante est offerte.',

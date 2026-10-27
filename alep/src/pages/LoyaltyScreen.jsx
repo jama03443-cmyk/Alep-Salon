@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { isSupabaseConfigured, supabase } from '../supabaseClient'
-import { DEFAULT_LOYALTY_PROGRAM, getLoyaltyProgramSettings, LOYALTY_PROGRAM_CARDS } from '../loyaltyProgram'
+import { DEFAULT_LOYALTY_PROGRAM, getLoyaltyProgramSettings, getLoyaltyProgramSteps } from '../loyaltyProgram'
 import PwaBottomNav from '../PwaBottomNav'
 
 function formatMemberSince(date) {
@@ -44,6 +44,7 @@ export default function LoyaltyScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [copied, setCopied] = useState(false)
   const [loyaltyProgram, setLoyaltyProgram] = useState(DEFAULT_LOYALTY_PROGRAM)
+  const [loyaltySteps, setLoyaltySteps] = useState(() => getLoyaltyProgramSteps(DEFAULT_LOYALTY_PROGRAM))
   const [isLoadingLoyaltyData, setIsLoadingLoyaltyData] = useState(false)
   const [loyaltyLoadAttempt, setLoyaltyLoadAttempt] = useState(0)
 
@@ -53,10 +54,13 @@ export default function LoyaltyScreen() {
     const loadLoyaltyProgram = async () => {
       const { data, error } = await supabase
         .from('site_settings')
-        .select('loyalty_visits_for_reward, loyalty_reward_title, loyalty_reward_description, loyalty_birthday_title, loyalty_birthday_description, loyalty_referral_title, loyalty_referral_description, loyalty_review_title, loyalty_review_description')
+        .select('loyalty_visits_for_reward, loyalty_reward_title, loyalty_reward_description, loyalty_birthday_title, loyalty_birthday_description, loyalty_referral_title, loyalty_referral_description, loyalty_review_title, loyalty_review_description, loyalty_steps')
         .eq('id', true)
         .maybeSingle()
-      if (mounted && !error && data) setLoyaltyProgram(getLoyaltyProgramSettings(data))
+      if (mounted && !error && data) {
+        setLoyaltyProgram(getLoyaltyProgramSettings(data))
+        setLoyaltySteps(getLoyaltyProgramSteps(data))
+      }
     }
     void loadLoyaltyProgram()
     return () => { mounted = false }
@@ -271,7 +275,7 @@ export default function LoyaltyScreen() {
         <section className="border border-zinc-800 bg-zinc-900/50 p-6 sm:p-8"><div className="space-y-5"><div><p className="font-display text-3xl font-bold uppercase tracking-tight">Votre carte digitale.</p><p className="mt-2 text-sm leading-6 text-zinc-500">Connectez-vous avec Google. Lors de votre première visite uniquement, vous compléterez votre prénom, votre nom et votre WhatsApp.</p></div>{errorMessage && <InlineError>{errorMessage}</InlineError>}<button type="button" onClick={handleGoogleLogin} className="flex w-full items-center justify-center gap-3 border border-zinc-600 bg-white px-5 py-4 text-sm font-bold text-zinc-950 transition hover:-translate-y-0.5 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-70" disabled={isSubmitting}><span className="flex h-6 w-6 items-center justify-center rounded-full border border-zinc-300 font-black text-blue-600">G</span>{isSubmitting ? 'Redirection vers Google…' : 'Continuer avec Google'}<LogIn size={16} /></button><p className="flex items-center justify-center gap-2 text-center text-[10px] leading-4 text-zinc-600"><ShieldCheck size={13} /> Connexion sécurisée par Google et Supabase.</p></div>
         </section>
       </section>}
-      <HowItWorks settings={loyaltyProgram} />
+      <HowItWorks settings={loyaltyProgram} steps={loyaltySteps} />
     </div>
     <PwaBottomNav language="FR" />
   </main>
@@ -314,23 +318,25 @@ function PointEvent({ event }) { const isCredit = event.point_delta > 0; const d
 function SuccessToast({ title, text }) { return <aside role="status" className="loyalty-toast fixed inset-x-4 top-5 z-[100] mx-auto max-w-md border border-emerald-400/50 bg-zinc-900 px-4 py-4 shadow-2xl shadow-black/60 sm:inset-x-auto sm:right-6 sm:top-6 sm:w-[25rem]"><div className="flex gap-3"><CheckCircle2 size={21} className="mt-0.5 shrink-0 text-emerald-400" /><div><strong className="block text-sm text-zinc-100">{title}</strong><p className="mt-1 text-xs leading-5 text-zinc-400">{text}</p></div></div></aside> }
 function InlineError({ children }) { return <p role="alert" className="border-l-2 border-amber-200 bg-amber-200/5 px-3 py-2 text-xs leading-5 text-amber-100">{children}</p> }
 function LoyaltyLoadFailure({ message, onRetry, onBack }) { return <section className="mx-auto mt-14 max-w-xl border border-zinc-800 bg-zinc-900/50 p-6 sm:p-8"><h1 className="font-display text-3xl font-bold uppercase">Carte indisponible</h1><p className="mt-3 text-sm leading-6 text-zinc-400">La connexion Google a réussi, mais Alep Salon n’a pas pu charger votre carte fidélité.</p><div className="mt-5"><InlineError>{message || 'Vérifiez votre connexion puis réessayez.'}</InlineError></div><div className="mt-6 flex flex-col gap-3 sm:flex-row"><button type="button" onClick={onRetry} className="button-primary flex-1">Réessayer</button><button type="button" onClick={onBack} className="button-ghost flex-1">Retour</button></div></section> }
-function HowItWorks({ settings }) {
+function HowItWorks({ settings, steps }) {
   const visits = Math.max(2, Math.min(100, Number(settings.loyalty_visits_for_reward) || 10))
   const points = visits - 1
   const textFor = (text = '') => text.replaceAll('{visits}', String(visits)).replaceAll('{points}', String(points)).replaceAll('{stamps}', String(points))
-  const icons = { scissors: Scissors, gift: Gift, friends: UsersRound, star: Star }
+  const icons = { scissors: Scissors, gift: Gift, friends: UsersRound, star: Star, sparkles: Sparkles }
+
+  if (steps.length === 0) return null
 
   return <section className="mx-auto mt-16 max-w-4xl border-t border-zinc-800 pt-10 sm:mt-20 sm:pt-14">
     <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200"><Sparkles size={14} /> Programme fidélité</p>
     <h2 className="mt-4 font-display text-4xl font-bold uppercase leading-none tracking-tight sm:text-5xl">Comment ça marche</h2>
     <div className="mt-8 space-y-4">
-      {LOYALTY_PROGRAM_CARDS.map(({ titleKey, descriptionKey, icon }) => {
-        const Icon = icons[icon]
-        return <article key={titleKey} className="flex gap-4 rounded-3xl border border-zinc-800 bg-zinc-900/50 p-5 sm:gap-6 sm:p-6">
+      {steps.map((step) => {
+        const Icon = icons[step.icon] || Sparkles
+        return <article key={step.id} className="flex gap-4 rounded-3xl border border-zinc-800 bg-zinc-900/50 p-5 sm:gap-6 sm:p-6">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-200/10 text-amber-200"><Icon size={22} strokeWidth={1.8} /></span>
           <div className="min-w-0">
-            <h3 className="font-display text-xl font-bold sm:text-2xl">{textFor(settings[titleKey])}</h3>
-            <p className="mt-2 text-sm leading-6 text-zinc-400 sm:text-base sm:leading-7">{textFor(settings[descriptionKey])}</p>
+            <h3 className="font-display text-xl font-bold sm:text-2xl">{textFor(step.title)}</h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-400 sm:text-base sm:leading-7">{textFor(step.description)}</p>
           </div>
         </article>
       })}
