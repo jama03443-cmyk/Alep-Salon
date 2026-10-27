@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle2, Copy, Gift, History, LogIn, LogOut, Minus, Plus, Scissors, ShieldCheck, Sparkles, Star, UserRound, UsersRound } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Copy, Gift, History, LogIn, LogOut, Minus, Plus, Scissors, ShieldCheck, Sparkles, Star, UserRound, UsersRound } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
@@ -235,16 +235,21 @@ export default function LoyaltyScreen() {
     setProfile(null)
   }
 
+  const needsProfileCompletion = Boolean(profile && (!profile.first_name || !profile.last_name || !profile.whatsapp))
+
   if (isLoading) return <LoadingScreen />
 
   return <main className="min-h-screen bg-zinc-950 px-5 py-8 text-zinc-100 sm:px-8 lg:px-10">
     {toast && <SuccessToast title={toast.title} text={toast.text} />}
     <div className="mx-auto max-w-5xl">
       <header className="flex items-center justify-between border-b border-zinc-800 pb-6">
-        <Link to="/" aria-label="Alep Salon — accueil" className="inline-flex items-center transition-opacity hover:opacity-80"><img src="/alep-salon-logo.png" alt="Alep Salon" className="h-12 w-auto max-w-[190px] object-contain" /></Link>
-        {session && <button type="button" onClick={signOut} className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition hover:text-amber-200"><LogOut size={14} /> Déconnexion</button>}
+        <div className="flex min-w-0 items-center gap-4">
+          {needsProfileCompletion && <button type="button" onClick={signOut} className="inline-flex shrink-0 items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-300 transition hover:text-amber-200"><ArrowLeft size={15} /> Précédent</button>}
+          <Link to="/" aria-label="Alep Salon — accueil" className="inline-flex items-center transition-opacity hover:opacity-80"><img src="/alep-salon-logo.png" alt="Alep Salon" className="h-12 w-auto max-w-[190px] object-contain" /></Link>
+        </div>
+        {session && profile && !needsProfileCompletion && <button type="button" onClick={signOut} className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition hover:text-amber-200"><LogOut size={14} /> Déconnexion</button>}
       </header>
-      {session ? <>{profile && (!profile.first_name || !profile.last_name || !profile.whatsapp) ? <ProfileCompletion firstName={firstName} lastName={lastName} whatsappInput={whatsappInput} setFirstName={setFirstName} setLastName={setLastName} setWhatsappInput={setWhatsappInput} onSubmit={handleProfileCompletion} isSubmitting={isSubmitting} errorMessage={errorMessage} /> : <LoyaltyCard card={card} events={pointEvents} copied={copied} onCopy={copyCode} rewardVisits={loyaltyProgram.loyalty_visits_for_reward} />}</> : <section className="mx-auto mt-14 grid max-w-4xl gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+      {session ? <>{needsProfileCompletion ? <ProfileCompletion firstName={firstName} lastName={lastName} whatsappInput={whatsappInput} setFirstName={setFirstName} setLastName={setLastName} setWhatsappInput={setWhatsappInput} onSubmit={handleProfileCompletion} isSubmitting={isSubmitting} errorMessage={errorMessage} /> : <LoyaltyCard card={card} events={pointEvents} copied={copied} onCopy={copyCode} rewardVisits={loyaltyProgram.loyalty_visits_for_reward} />}</> : <section className="mx-auto mt-14 grid max-w-4xl gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
         <div><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200"><Sparkles size={14} /> Programme fidélité</p><h1 className="mt-5 font-display text-6xl font-bold uppercase leading-[0.86] tracking-tight sm:text-7xl">Chaque visite<br />compte.</h1><p className="mt-6 max-w-md text-sm leading-7 text-zinc-400">Connectez-vous avec Google. Lors de votre première visite, nous vous demanderons uniquement votre prénom, votre nom et votre WhatsApp.</p><div className="mt-8 grid grid-cols-3 gap-3 text-center"><Benefit label="Google sécurisé" /><Benefit label="QR personnel" /><Benefit label="Points cumulés" /></div></div>
         <section className="border border-zinc-800 bg-zinc-900/50 p-6 sm:p-8"><div className="space-y-5"><div><p className="font-display text-3xl font-bold uppercase tracking-tight">Votre carte digitale.</p><p className="mt-2 text-sm leading-6 text-zinc-500">Connectez-vous avec Google. Lors de votre première visite uniquement, vous compléterez votre prénom, votre nom et votre WhatsApp.</p></div>{errorMessage && <InlineError>{errorMessage}</InlineError>}<button type="button" onClick={handleGoogleLogin} className="flex w-full items-center justify-center gap-3 border border-zinc-600 bg-white px-5 py-4 text-sm font-bold text-zinc-950 transition hover:-translate-y-0.5 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-70" disabled={isSubmitting}><span className="flex h-6 w-6 items-center justify-center rounded-full border border-zinc-300 font-black text-blue-600">G</span>{isSubmitting ? 'Redirection vers Google…' : 'Continuer avec Google'}<LogIn size={16} /></button><p className="flex items-center justify-center gap-2 text-center text-[10px] leading-4 text-zinc-600"><ShieldCheck size={13} /> Connexion sécurisée par Google et Supabase.</p></div>
         </section>
