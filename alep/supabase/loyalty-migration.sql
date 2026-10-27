@@ -78,21 +78,31 @@ begin
 
   if nullif(btrim(profile_first_name), '') is null
     or nullif(btrim(profile_last_name), '') is null
+    or profile_whatsapp is null
     or profile_whatsapp !~ '^\+41[0-9]{9}$' then
     raise exception 'Invalid profile details';
   end if;
 
-  update public.profiles
-  set first_name = btrim(profile_first_name),
-      last_name = btrim(profile_last_name),
-      full_name = btrim(profile_first_name) || ' ' || btrim(profile_last_name),
-      whatsapp = profile_whatsapp
-  where id = auth.uid()
+  insert into public.profiles (id, full_name, first_name, last_name, whatsapp, email)
+  values (
+    auth.uid(),
+    btrim(profile_first_name) || ' ' || btrim(profile_last_name),
+    btrim(profile_first_name),
+    btrim(profile_last_name),
+    profile_whatsapp,
+    auth.jwt() ->> 'email'
+  )
+  on conflict (id) do update set
+    first_name = excluded.first_name,
+    last_name = excluded.last_name,
+    full_name = excluded.full_name,
+    whatsapp = excluded.whatsapp,
+    email = coalesce(public.profiles.email, excluded.email)
   returning * into updated_profile;
 
-  if updated_profile.id is null then
-    raise exception 'Profile not found';
-  end if;
+  insert into public.loyalty_cards (profile_id)
+  values (auth.uid())
+  on conflict (profile_id) do nothing;
 
   return updated_profile;
 end;
