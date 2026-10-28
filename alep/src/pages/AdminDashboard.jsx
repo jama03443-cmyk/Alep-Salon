@@ -347,7 +347,7 @@ export default function AdminDashboard() {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext
       if (AudioContextClass) {
         soundContext = new AudioContextClass()
-        await soundContext.resume()
+        if (soundContext.state === 'suspended') void soundContext.resume().catch(() => {})
       }
     } catch {
       soundContext = null
@@ -360,28 +360,29 @@ export default function AdminDashboard() {
     if (error) setFeedback({ type: 'error', text: 'La visite ne peut pas être validée.' })
     else {
       if (soundContext) {
+        if (soundContext.state === 'suspended') await soundContext.resume().catch(() => {})
         const master = soundContext.createGain()
         master.gain.setValueAtTime(0.0001, soundContext.currentTime)
-        master.gain.exponentialRampToValueAtTime(0.16, soundContext.currentTime + 0.035)
-        master.gain.exponentialRampToValueAtTime(0.0001, soundContext.currentTime + 0.8)
+        master.gain.exponentialRampToValueAtTime(0.65, soundContext.currentTime + 0.025)
+        master.gain.exponentialRampToValueAtTime(0.0001, soundContext.currentTime + 1.05)
         master.connect(soundContext.destination)
 
-        ;[659.25, 830.61, 1046.5].forEach((frequency, index) => {
-          const start = soundContext.currentTime + index * 0.13
+        ;[784, 988, 1175, 1568].forEach((frequency, index) => {
+          const start = soundContext.currentTime + index * 0.12
           const oscillator = soundContext.createOscillator()
           const noteGain = soundContext.createGain()
-          oscillator.type = 'sine'
+          oscillator.type = index === 3 ? 'sine' : 'triangle'
           oscillator.frequency.setValueAtTime(frequency, start)
           noteGain.gain.setValueAtTime(0.0001, start)
-          noteGain.gain.exponentialRampToValueAtTime(1, start + 0.025)
-          noteGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28)
+          noteGain.gain.exponentialRampToValueAtTime(0.8, start + 0.018)
+          noteGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.38)
           oscillator.connect(noteGain)
           noteGain.connect(master)
           oscillator.start(start)
-          oscillator.stop(start + 0.3)
+          oscillator.stop(start + 0.4)
         })
 
-        window.setTimeout(() => { void soundContext.close().catch(() => {}) }, 1000)
+        window.setTimeout(() => { void soundContext.close().catch(() => {}) }, 1300)
       }
       setFeedback({ type: 'success', text: '1 point ajouté au client.' })
       await refreshLoyaltyCards()
