@@ -269,7 +269,7 @@ export default function AdminDashboard() {
           const card = loyaltyCards.find((item) => item.member_code === scannedCode)
           setSelectedLoyaltyCard(card ?? null)
           setLoyaltySearch(scannedCode)
-          setScannerMessage(card ? 'Carte trouvée. Validez la visite ci-dessous.' : 'Aucune carte ne correspond à ce QR code.')
+          setScannerMessage(card ? 'Carte trouvée.' : 'Aucune carte ne correspond à ce QR code.')
           setIsScanning(false)
         }, 700)
       } catch {
@@ -333,7 +333,7 @@ export default function AdminDashboard() {
       || loyaltyCards.find((card) => card.profiles?.full_name?.toLowerCase() === loyaltySearch.trim().toLowerCase())
       || loyaltyCards.find((card) => card.profiles?.phone === loyaltySearch.trim())
     setSelectedLoyaltyCard(match ?? null)
-    setScannerMessage(match ? 'Carte trouvée. Validez la visite.' : 'Aucune carte ne correspond à ce code ou ce nom.')
+    setScannerMessage(match ? 'Carte trouvée.' : 'Aucune carte ne correspond à ce code ou ce nom.')
   }
 
   const validateVisit = async (cardId) => {
@@ -345,7 +345,7 @@ export default function AdminDashboard() {
     })
     if (error) setFeedback({ type: 'error', text: 'La visite ne peut pas être validée.' })
     else {
-      setFeedback({ type: 'success', text: 'Visite validée : 1 point a été ajouté.' })
+      setFeedback({ type: 'success', text: '1 point ajouté au client.' })
       await refreshLoyaltyCards()
       await loyaltyLiveChannelRef.current?.send({
         type: 'broadcast',
