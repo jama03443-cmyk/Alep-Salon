@@ -24,28 +24,42 @@ import './App.css'
 
 gsap.registerPlugin(ScrollTrigger)
 
-const CLIENT_PWA_INTRO_KEY = 'alep-client-pwa-intro-seen'
-
-function isStandaloneClientPwa() {
-  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true
-}
+const SITE_BRANDING_CACHE_KEY = 'alep-site-branding-v1'
 
 function shouldShowClientIntro() {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false
-  if (!isStandaloneClientPwa()) return true
+  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function readCachedSiteBranding() {
   try {
-    return window.localStorage.getItem(CLIENT_PWA_INTRO_KEY) !== 'true'
+    const cached = JSON.parse(window.localStorage.getItem(SITE_BRANDING_CACHE_KEY) || 'null')
+    return {
+      heroImageUrl: typeof cached?.heroImageUrl === 'string' ? cached.heroImageUrl : '',
+      branding: {
+        body_color: cached?.branding?.body_color || BODY_COLOR_OPTIONS[0].value,
+        footer_color: cached?.branding?.footer_color || FOOTER_COLOR_OPTIONS[0].value,
+        button_color: cached?.branding?.button_color || BUTTON_COLOR_OPTIONS[0].value,
+        logo_style: cached?.branding?.logo_style || 'classic',
+      },
+    }
   } catch {
-    return true
+    return {
+      heroImageUrl: '',
+      branding: {
+        body_color: BODY_COLOR_OPTIONS[0].value,
+        footer_color: FOOTER_COLOR_OPTIONS[0].value,
+        button_color: BUTTON_COLOR_OPTIONS[0].value,
+        logo_style: 'classic',
+      },
+    }
   }
 }
 
-function rememberClientIntro() {
-  if (!isStandaloneClientPwa()) return
+function cacheSiteBranding(heroImageUrl, branding) {
   try {
-    window.localStorage.setItem(CLIENT_PWA_INTRO_KEY, 'true')
+    window.localStorage.setItem(SITE_BRANDING_CACHE_KEY, JSON.stringify({ heroImageUrl, branding }))
   } catch {
-    // The intro can still finish normally when storage is unavailable.
+    // Current settings still apply for this visit when browser storage is unavailable.
   }
 }
 
@@ -253,6 +267,7 @@ const fallbackSalons = [
 ]
 
 function PublicSite() {
+  const [cachedSiteBranding] = useState(readCachedSiteBranding)
   const [language, setLanguage] = useState('FR')
   const [introVisible, setIntroVisible] = useState(() => shouldShowClientIntro())
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -261,13 +276,8 @@ function PublicSite() {
   const [installDialogOpen, setInstallDialogOpen] = useState(false)
   const [installHelpMessage, setInstallHelpMessage] = useState('')
   const [managedSalons, setManagedSalons] = useState([])
-  const [managedHeroImageUrl, setManagedHeroImageUrl] = useState('')
-  const [managedBranding, setManagedBranding] = useState({
-    body_color: BODY_COLOR_OPTIONS[0].value,
-    footer_color: FOOTER_COLOR_OPTIONS[0].value,
-    button_color: BUTTON_COLOR_OPTIONS[0].value,
-    logo_style: 'classic',
-  })
+  const [managedHeroImageUrl, setManagedHeroImageUrl] = useState(cachedSiteBranding.heroImageUrl)
+  const [managedBranding, setManagedBranding] = useState(cachedSiteBranding.branding)
   const [managedServices, setManagedServices] = useState([])
   const [isManagedServicesLoaded, setIsManagedServicesLoaded] = useState(false)
   const [managedBarbers, setManagedBarbers] = useState([])
@@ -299,7 +309,6 @@ function PublicSite() {
     if (!introVisible) return undefined
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
 
-    rememberClientIntro()
     const introTimeline = gsap.timeline({ onComplete: () => setIntroVisible(false) })
     introTimeline
       .fromTo('.site-intro-logo',
@@ -500,13 +509,18 @@ function PublicSite() {
         setIsManagedServicesLoaded(true)
       }
       if (!barbersResult.error) setManagedBarbers(barbersResult.data ?? [])
-      if (!heroSettingsResult.error) setManagedHeroImageUrl(heroSettingsResult.data?.hero_image_url ?? '')
-      if (!heroSettingsResult.error && heroSettingsResult.data) setManagedBranding({
-        body_color: heroSettingsResult.data.body_color || BODY_COLOR_OPTIONS[0].value,
-        footer_color: heroSettingsResult.data.footer_color || FOOTER_COLOR_OPTIONS[0].value,
-        button_color: heroSettingsResult.data.button_color || BUTTON_COLOR_OPTIONS[0].value,
-        logo_style: heroSettingsResult.data.logo_style || 'classic',
-      })
+      if (!heroSettingsResult.error && heroSettingsResult.data) {
+        const heroImageUrl = heroSettingsResult.data.hero_image_url ?? ''
+        const branding = {
+          body_color: heroSettingsResult.data.body_color || BODY_COLOR_OPTIONS[0].value,
+          footer_color: heroSettingsResult.data.footer_color || FOOTER_COLOR_OPTIONS[0].value,
+          button_color: heroSettingsResult.data.button_color || BUTTON_COLOR_OPTIONS[0].value,
+          logo_style: heroSettingsResult.data.logo_style || 'classic',
+        }
+        setManagedHeroImageUrl(heroImageUrl)
+        setManagedBranding(branding)
+        cacheSiteBranding(heroImageUrl, branding)
+      }
     }
 
     void loadPublicContent()

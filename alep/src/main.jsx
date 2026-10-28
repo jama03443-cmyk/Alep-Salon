@@ -13,21 +13,6 @@ window.addEventListener('appinstalled', () => {
   window.alepInstallPrompt = null
 })
 
-if ('serviceWorker' in navigator) {
-  let hasController = Boolean(navigator.serviceWorker.controller)
-  let isReloadingForUpdate = false
-
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!hasController) {
-      hasController = true
-      return
-    }
-    if (isReloadingForUpdate) return
-    isReloadingForUpdate = true
-    window.location.reload()
-  })
-}
-
 class AppErrorBoundary extends Component {
   state = { error: null }
 
