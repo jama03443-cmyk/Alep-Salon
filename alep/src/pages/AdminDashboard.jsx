@@ -342,12 +342,47 @@ export default function AdminDashboard() {
   const validateVisit = async (cardId) => {
     if (!supabase) return
     setFeedback(null)
+    let soundContext
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext
+      if (AudioContextClass) {
+        soundContext = new AudioContextClass()
+        await soundContext.resume()
+      }
+    } catch {
+      soundContext = null
+    }
+
     const { error } = await supabase.rpc('adjust_loyalty_points', {
       target_card_id: cardId,
       point_delta: 1,
     })
     if (error) setFeedback({ type: 'error', text: 'La visite ne peut pas être validée.' })
     else {
+      if (soundContext) {
+        const master = soundContext.createGain()
+        master.gain.setValueAtTime(0.0001, soundContext.currentTime)
+        master.gain.exponentialRampToValueAtTime(0.16, soundContext.currentTime + 0.035)
+        master.gain.exponentialRampToValueAtTime(0.0001, soundContext.currentTime + 0.8)
+        master.connect(soundContext.destination)
+
+        ;[659.25, 830.61, 1046.5].forEach((frequency, index) => {
+          const start = soundContext.currentTime + index * 0.13
+          const oscillator = soundContext.createOscillator()
+          const noteGain = soundContext.createGain()
+          oscillator.type = 'sine'
+          oscillator.frequency.setValueAtTime(frequency, start)
+          noteGain.gain.setValueAtTime(0.0001, start)
+          noteGain.gain.exponentialRampToValueAtTime(1, start + 0.025)
+          noteGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28)
+          oscillator.connect(noteGain)
+          noteGain.connect(master)
+          oscillator.start(start)
+          oscillator.stop(start + 0.3)
+        })
+
+        window.setTimeout(() => { void soundContext.close().catch(() => {}) }, 1000)
+      }
       setFeedback({ type: 'success', text: '1 point ajouté au client.' })
       await refreshLoyaltyCards()
       await loyaltyLiveChannelRef.current?.send({
