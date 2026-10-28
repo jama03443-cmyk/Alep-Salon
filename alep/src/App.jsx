@@ -546,6 +546,49 @@ function PublicSite() {
     return () => { isMounted = false }
   }, [])
 
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return undefined
+    let isMounted = true
+
+    const refreshManagedBranding = async () => {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('hero_image_url, body_color, footer_color, button_color, logo_style')
+        .eq('id', true)
+        .maybeSingle()
+
+      if (!isMounted || error || !data) return
+
+      const heroImageUrl = data.hero_image_url ?? ''
+      const branding = {
+        body_color: data.body_color || BODY_COLOR_OPTIONS[0].value,
+        footer_color: data.footer_color || FOOTER_COLOR_OPTIONS[0].value,
+        button_color: data.button_color || BUTTON_COLOR_OPTIONS[0].value,
+        logo_style: data.logo_style || 'classic',
+      }
+      setManagedHeroImageUrl(heroImageUrl)
+      setManagedBranding(branding)
+      cacheSiteBranding(heroImageUrl, branding)
+    }
+
+    const refreshOnResume = () => {
+      if (document.visibilityState === 'visible') void refreshManagedBranding()
+    }
+
+    const timer = window.setInterval(() => void refreshManagedBranding(), 15_000)
+    document.addEventListener('visibilitychange', refreshOnResume)
+    window.addEventListener('focus', refreshOnResume)
+    window.addEventListener('pageshow', refreshOnResume)
+
+    return () => {
+      isMounted = false
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshOnResume)
+      window.removeEventListener('focus', refreshOnResume)
+      window.removeEventListener('pageshow', refreshOnResume)
+    }
+  }, [])
+
   const salons = useMemo(() => fallbackSalons.map((fallback) => {
     const managed = managedSalons.find((salon) => salon.id === fallback.key)
     if (!managed) return fallback

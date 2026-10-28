@@ -1002,12 +1002,16 @@ export default function AdminDashboard() {
     }
     setIsSavingBranding(true)
     setFeedback(null)
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('site_settings')
       .update({ body_color: siteBodyColor, footer_color: siteFooterColor, button_color: siteButtonColor, logo_style: siteLogoStyle, ...loyaltyProgram, loyalty_visits_for_reward: rewardVisits, loyalty_steps: loyaltySteps })
       .eq('id', true)
+      .select('body_color, footer_color, button_color, logo_style')
+      .maybeSingle()
 
-    if (error) {
+    if (!error && !data) {
+      setFeedback({ type: 'error', text: 'Aucun réglage n’a été modifié. Vérifiez la ligne site_settings et les droits administrateur Supabase.' })
+    } else if (error) {
       setFeedback({ type: 'error', text: 'Impossible d’enregistrer les réglages. Vérifiez que hero-image-migration.sql, loyalty-program-settings-migration.sql et loyalty-steps-migration.sql ont été exécutés dans Supabase.' })
     } else {
       setFeedback({ type: 'success', text: 'Les réglages et le programme de fidélité ont été enregistrés.' })
