@@ -19,6 +19,7 @@ import { useAuth } from '../auth/useAuth'
 import { BARBER_ASSETS_BUCKET, SERVICE_ASSETS_BUCKET, supabase } from '../supabaseClient'
 import { BODY_COLOR_OPTIONS, BUTTON_COLOR_OPTIONS, FOOTER_COLOR_OPTIONS, LOGO_STYLE_OPTIONS } from '../siteBranding'
 import { DEFAULT_LOYALTY_PROGRAM, getLoyaltyProgramSettings, getLoyaltyProgramSteps } from '../loyaltyProgram'
+import BrandLogo from '../BrandLogo'
 
 const salonNames = {
   bienne: 'Bienne',
@@ -1083,7 +1084,7 @@ export default function AdminDashboard() {
       <header className="border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-8 sm:py-5 lg:px-10">
           <div className="flex min-w-0 items-center gap-3">
-            <img src="/alep-salon-logo.png" alt="Alep Salon" className="h-10 w-auto max-w-[52vw] object-contain sm:h-12 sm:max-w-[190px]" />
+            <BrandLogo style={siteLogoStyle} className="!h-10 w-auto max-w-[52vw] object-contain sm:!h-12 sm:max-w-[190px]" />
             <p className="min-w-0 border-l border-zinc-700 pl-3 text-[9px] font-bold uppercase leading-4 tracking-[0.12em] text-zinc-500 sm:text-[10px] sm:tracking-[0.2em]">{labels.admin}</p>
           </div>
           <div className="flex items-center justify-between gap-4 sm:justify-end">

@@ -20,6 +20,8 @@ import { useAuth } from './auth/useAuth'
 import { isSupabaseConfigured, supabase } from './supabaseClient'
 import PwaBottomNav from './PwaBottomNav'
 import { BODY_COLOR_OPTIONS, BUTTON_COLOR_OPTIONS, FOOTER_COLOR_OPTIONS, getButtonTextColor, getContrastTextColor } from './siteBranding'
+import BrandLogo from './BrandLogo'
+import useLogoStyle from './useLogoStyle'
 import './App.css'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -144,16 +146,6 @@ function formatServicePrice(price) {
   const value = String(price ?? '').trim()
   if (!value || /chf/i.test(value)) return value
   return `${value} CHF`
-}
-
-function BrandLogo({ style }) {
-  if (style === 'wordmark') {
-    return <span className="flex flex-col items-center font-display leading-none"><span className="text-2xl font-black tracking-[0.16em] text-white">ALEP</span><span className="mt-1 border px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.3em]" style={{ borderColor: 'var(--site-button-color)', color: 'var(--site-button-color)' }}>SALON</span></span>
-  }
-  if (style === 'monogram') {
-    return <span className="flex items-center gap-2.5"><span className="flex h-10 w-10 items-center justify-center rounded-full border" style={{ borderColor: 'var(--site-button-color)', color: 'var(--site-button-color)' }}><Scissors size={18} strokeWidth={1.8} /></span><span className="flex flex-col font-display text-sm font-black uppercase leading-[0.9] tracking-[0.15em] text-white">Alep<span className="mt-1 text-[9px] font-semibold tracking-[0.26em]" style={{ color: 'var(--site-button-color)' }}>Salon</span></span></span>
-  }
-  return <img src="/alep-salon-logo.png" alt="Alep Salon" className="h-14 w-auto max-w-[190px] object-contain" />
 }
 
 const content = {
@@ -1400,6 +1392,7 @@ function App() {
 
 function AdminIntroOverlay() {
   const [visible, setVisible] = useState(() => window.location.pathname.startsWith('/admin-'))
+  const logoStyle = useLogoStyle(visible)
 
   useEffect(() => {
     if (!visible) return undefined
@@ -1417,7 +1410,7 @@ function AdminIntroOverlay() {
     <div className="admin-intro fixed inset-0 z-[250] flex items-center justify-center bg-black" aria-hidden="true">
       <div className="flex flex-col items-center gap-5">
         <div className="admin-intro-logo">
-          <img src="/alep-salon-logo.png" alt="Alep Salon" className="h-auto w-[min(82vw,420px)] max-w-none" />
+          <BrandLogo style={logoStyle} className={logoStyle === 'classic' ? 'h-auto w-[min(82vw,420px)] max-w-none' : ''} />
         </div>
         <p className="admin-intro-label font-display text-sm font-bold uppercase tracking-[0.48em] text-amber-200 sm:text-base">ADMIN</p>
       </div>
