@@ -300,9 +300,28 @@ function PublicSite() {
   }
 
   useEffect(() => {
-    const updateSalonStatus = () => setSalonStatus(getSalonStatus(fallbackSalons[0].schedule.FR, language))
-    const timer = window.setInterval(updateSalonStatus, 60_000)
-    return () => window.clearInterval(timer)
+    const updateSalonStatus = () => {
+      const nextStatus = getSalonStatus(fallbackSalons[0].schedule.FR, language)
+      setSalonStatus((currentStatus) => currentStatus.isOpen === nextStatus.isOpen && currentStatus.detail === nextStatus.detail
+        ? currentStatus
+        : nextStatus)
+    }
+    const refreshOnResume = () => {
+      if (document.visibilityState === 'visible') updateSalonStatus()
+    }
+
+    updateSalonStatus()
+    const timer = window.setInterval(updateSalonStatus, 15_000)
+    document.addEventListener('visibilitychange', refreshOnResume)
+    window.addEventListener('focus', refreshOnResume)
+    window.addEventListener('pageshow', refreshOnResume)
+
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshOnResume)
+      window.removeEventListener('focus', refreshOnResume)
+      window.removeEventListener('pageshow', refreshOnResume)
+    }
   }, [language])
 
   useEffect(() => {
