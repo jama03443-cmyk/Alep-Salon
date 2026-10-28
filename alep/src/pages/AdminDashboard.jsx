@@ -993,6 +993,33 @@ export default function AdminDashboard() {
     await loadDashboard({ clearFeedback: true })
   }
 
+  const handleSaveSiteAppearance = async () => {
+    if (!supabase || isSavingBranding) return
+    setIsSavingBranding(true)
+    setFeedback(null)
+
+    const { data, error } = await supabase
+      .from('site_settings')
+      .update({ body_color: siteBodyColor, footer_color: siteFooterColor, button_color: siteButtonColor, logo_style: siteLogoStyle })
+      .eq('id', true)
+      .select('body_color, footer_color, button_color, logo_style')
+      .maybeSingle()
+
+    if (error) {
+      setFeedback({ type: 'error', text: `Le design n’a pas pu être enregistré : ${error.message}` })
+    } else if (!data) {
+      setFeedback({ type: 'error', text: 'Le design n’a pas été enregistré : la ligne site_settings est introuvable ou l’accès Admin est refusé.' })
+    } else {
+      setSiteBodyColor(data.body_color)
+      setSiteFooterColor(data.footer_color)
+      setSiteButtonColor(data.button_color)
+      setSiteLogoStyle(data.logo_style)
+      setFeedback({ type: 'success', text: 'Le design du site client a été enregistré.' })
+    }
+
+    setIsSavingBranding(false)
+  }
+
   const handleSaveBranding = async () => {
     if (!supabase || isSavingBranding) return
     const rewardVisits = Number(loyaltyProgram.loyalty_visits_for_reward)
@@ -1004,9 +1031,9 @@ export default function AdminDashboard() {
     setFeedback(null)
     const { data, error } = await supabase
       .from('site_settings')
-      .update({ body_color: siteBodyColor, footer_color: siteFooterColor, button_color: siteButtonColor, logo_style: siteLogoStyle, ...loyaltyProgram, loyalty_visits_for_reward: rewardVisits, loyalty_steps: loyaltySteps })
+      .update({ ...loyaltyProgram, loyalty_visits_for_reward: rewardVisits, loyalty_steps: loyaltySteps })
       .eq('id', true)
-      .select('body_color, footer_color, button_color, logo_style')
+      .select('loyalty_visits_for_reward, loyalty_steps')
       .maybeSingle()
 
     if (!error && !data) {
@@ -1291,7 +1318,7 @@ export default function AdminDashboard() {
                     </button>)}
                   </div>
                 </section>
-                <button type="button" className="button-primary w-full" onClick={() => void handleSaveBranding()} disabled={isSavingBranding}><Check size={16} />{isSavingBranding ? 'Enregistrement…' : 'Enregistrer le design'}</button>
+                <button type="button" className="button-primary w-full" onClick={() => void handleSaveSiteAppearance()} disabled={isSavingBranding}><Check size={16} />{isSavingBranding ? 'Enregistrement…' : 'Enregistrer le design'}</button>
               </div>
             </article>
 
