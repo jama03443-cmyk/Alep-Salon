@@ -58,16 +58,16 @@ export default function LoginScreen() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-950 px-5 py-12 text-zinc-100">
+    <main className="relative flex min-h-screen min-h-[100svh] items-center justify-center overflow-x-hidden bg-zinc-950 px-4 py-8 text-zinc-100 sm:px-5 sm:py-12">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(180,145,78,0.14),transparent_28%),radial-gradient(circle_at_20%_80%,rgba(63,63,70,0.35),transparent_27%)]" />
-      <section className="relative w-full max-w-md border border-zinc-800 bg-zinc-900/75 p-7 shadow-2xl shadow-black/40 backdrop-blur sm:p-10">
+      <section className="relative w-full max-w-md border border-zinc-800 bg-zinc-900/75 p-5 shadow-2xl shadow-black/40 backdrop-blur sm:p-10">
         <a href="/admin-portal" aria-label="Alep Admin — connexion" className="inline-flex items-center text-zinc-100 transition-opacity hover:opacity-80">
-          <img src="/alep-salon-logo.png" alt="Alep Salon" className="h-14 w-auto max-w-[190px] object-contain" />
+          <img src="/alep-salon-logo.png" alt="Alep Salon" className="h-12 w-auto max-w-[72vw] object-contain sm:h-14 sm:max-w-[190px]" />
         </a>
 
-        <div className="mt-10">
+        <div className="mt-8 sm:mt-10">
           <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.24em] text-amber-200"><Lock size={13} /> Accès sécurisé</p>
-          <h1 className="mt-4 font-display text-4xl font-bold uppercase leading-none tracking-tight text-zinc-50">Administration</h1>
+          <h1 className="mt-4 break-words font-display text-3xl font-bold uppercase leading-none tracking-tight text-zinc-50 sm:text-4xl">Administration</h1>
           <p className="mt-4 text-sm leading-6 text-zinc-400">Connectez-vous avec un compte possédant le rôle administrateur.</p>
         </div>
 

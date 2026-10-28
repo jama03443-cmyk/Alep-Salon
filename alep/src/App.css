@@ -565,6 +565,22 @@ button:focus-visible {
   border-color: #fde68a;
 }
 
+.admin-dashboard article { min-width: 0; }
+.admin-dashboard .overflow-x-auto {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 639px) {
+  .admin-dashboard article { padding: 1rem; }
+  .admin-dashboard h2,
+  .admin-dashboard h3,
+  .admin-dashboard h4 { overflow-wrap: anywhere; }
+  .admin-dashboard .button-primary,
+  .admin-dashboard .button-ghost { max-width: 100%; white-space: normal; text-align: center; }
+}
+
 .loyalty-input {
   height: 3rem;
   width: 100%;

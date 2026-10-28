@@ -834,12 +834,12 @@ export default function AdminDashboard() {
   const selectedBarberSlots = availabilitySlots.filter((slot) => slot.barber_id === selectedBarberId && slot.appointment_date === availabilityDraft.appointmentDate)
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100">
+    <main className="admin-dashboard min-h-screen overflow-x-clip bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
-          <div className="flex items-center gap-3">
-            <img src="/alep-salon-logo.png" alt="Alep Salon" className="h-12 w-auto max-w-[190px] object-contain" />
-            <p className="border-l border-zinc-700 pl-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">{labels.admin}</p>
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-8 sm:py-5 lg:px-10">
+          <div className="flex min-w-0 items-center gap-3">
+            <img src="/alep-salon-logo.png" alt="Alep Salon" className="h-10 w-auto max-w-[52vw] object-contain sm:h-12 sm:max-w-[190px]" />
+            <p className="min-w-0 border-l border-zinc-700 pl-3 text-[9px] font-bold uppercase leading-4 tracking-[0.12em] text-zinc-500 sm:text-[10px] sm:tracking-[0.2em]">{labels.admin}</p>
           </div>
           <div className="flex items-center justify-between gap-4 sm:justify-end">
             <div className="flex items-center gap-1 rounded-full border border-zinc-800 p-1" aria-label="Langue">
@@ -852,13 +852,13 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1440px] px-5 py-10 sm:px-8 lg:px-10">
+      <div className="mx-auto max-w-[1440px] px-4 py-7 sm:px-8 sm:py-10 lg:px-10">
         <div className="mb-9 flex flex-col gap-5 border-b border-zinc-800 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-amber-200">{labels.private}</p>
-            <h1 className="font-display text-5xl font-bold uppercase leading-none tracking-tight sm:text-6xl">{labels.dashboard}</h1>
+            <h1 className="break-words font-display text-4xl font-bold uppercase leading-none tracking-tight sm:text-6xl">{labels.dashboard}</h1>
           </div>
-          <div className="flex w-full gap-2 sm:w-auto">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
             <DashboardTab active={activeTab === 'reservations'} onClick={() => setActiveTab('reservations')} icon={<CalendarDays size={15} />}>
               {labels.reservations}
             </DashboardTab>
@@ -884,7 +884,7 @@ export default function AdminDashboard() {
           <section>
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="flex items-center gap-2 font-display text-3xl font-bold uppercase tracking-tight"><Users size={22} className="text-amber-200" /> {labels.reservationsTitle}</h2>
+                <h2 className="flex min-w-0 items-center gap-2 font-display text-2xl font-bold uppercase tracking-tight sm:text-3xl"><Users size={20} className="shrink-0 text-amber-200 sm:h-[22px] sm:w-[22px]" /> {labels.reservationsTitle}</h2>
                 <p className="mt-2 text-sm text-zinc-500">{upcomingReservationCount} {language === 'DE' ? 'bevorstehende Termine' : `rendez-vous à venir${upcomingReservationCount > 1 ? 's' : ''}`}.</p>
               </div>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -900,17 +900,17 @@ export default function AdminDashboard() {
           <section>
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="flex items-center gap-2 font-display text-3xl font-bold uppercase tracking-tight"><QrCode size={22} className="text-amber-200" /> {labels.loyaltyTitle}</h2>
+                <h2 className="flex min-w-0 items-center gap-2 font-display text-2xl font-bold uppercase tracking-tight sm:text-3xl"><QrCode size={20} className="shrink-0 text-amber-200 sm:h-[22px] sm:w-[22px]" /> {labels.loyaltyTitle}</h2>
                 <p className="mt-2 text-sm text-zinc-500">{loyaltyCards.length} client{loyaltyCards.length === 1 ? '' : 's'} inscrit{loyaltyCards.length === 1 ? '' : 's'} au programme.</p>
               </div>
               <button type="button" className="button-primary !min-h-0 !px-4 !py-3 text-[10px]" onClick={() => { setScannerMessage(''); setIsScanning(true) }}><Camera size={15} /> Scanner un QR code</button>
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-              <article className="border border-zinc-800 bg-zinc-900/35 p-6">
+              <article className="min-w-0 border border-zinc-800 bg-zinc-900/35 p-4 sm:p-6">
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-200">Validation de visite</p>
                 {isScanning && <div className="mt-5 overflow-hidden border border-amber-200/50 bg-black"><video ref={videoRef} muted playsInline className="aspect-video w-full object-cover" /><button type="button" className="w-full border-t border-zinc-800 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-zinc-100" onClick={() => setIsScanning(false)}>Arrêter la caméra</button></div>}
-                {!isScanning && <><label className="mt-5 block"><span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Code QR ou nom du client</span><div className="flex gap-2"><input value={loyaltySearch} onChange={(event) => setLoyaltySearch(event.target.value)} className="dashboard-input" placeholder="Scannez ou collez le code" /><button type="button" onClick={selectLoyaltyCard} className="border border-zinc-700 px-4 text-[10px] font-bold uppercase tracking-widest text-zinc-300 hover:border-amber-200 hover:text-amber-200">Trouver</button></div></label>{scannerMessage && <p className="mt-3 text-xs leading-5 text-zinc-400">{scannerMessage}</p>}</>}
+                {!isScanning && <><label className="mt-5 block"><span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Code QR ou nom du client</span><div className="flex min-w-0 gap-2"><input value={loyaltySearch} onChange={(event) => setLoyaltySearch(event.target.value)} className="dashboard-input min-w-0 flex-1" placeholder="Scannez ou collez le code" /><button type="button" onClick={selectLoyaltyCard} className="shrink-0 border border-zinc-700 px-3 text-[10px] font-bold uppercase tracking-widest text-zinc-300 hover:border-amber-200 hover:text-amber-200 sm:px-4">Trouver</button></div></label>{scannerMessage && <p className="mt-3 text-xs leading-5 text-zinc-400">{scannerMessage}</p>}</>}
                 {selectedLoyaltyCard && <div className="mt-6 border border-amber-200/40 bg-amber-200/5 p-5"><p className="font-display text-2xl font-bold uppercase">{selectedLoyaltyCard.profiles?.full_name || 'Client fidélité'}</p><p className="mt-1 text-xs text-zinc-400">E-mail : {selectedLoyaltyCard.profiles?.email || 'Non disponible'}</p><p className="mt-1 text-xs text-zinc-400">WhatsApp : {selectedLoyaltyCard.profiles?.whatsapp || 'Non disponible'}</p><p className="mt-1 font-mono text-xs text-zinc-500">{selectedLoyaltyCard.member_code}</p><p className="mt-5 text-sm text-zinc-300"><strong className="text-4xl text-amber-200">{selectedLoyaltyCard.points}</strong> points actuels</p><button type="button" className="button-primary mt-5 w-full" onClick={() => void validateVisit(selectedLoyaltyCard.id)}><Check size={16} /> Valider la visite · +1 point</button></div>}
               </article>
 
@@ -956,7 +956,7 @@ export default function AdminDashboard() {
         ) : activeTab === 'availability' ? (
           <section>
             <div className="mb-6">
-              <h2 className="flex items-center gap-2 font-display text-3xl font-bold uppercase tracking-tight"><CalendarDays size={22} className="text-amber-200" /> {labels.availabilityTitle}</h2>
+              <h2 className="flex min-w-0 items-center gap-2 font-display text-2xl font-bold uppercase tracking-tight sm:text-3xl"><CalendarDays size={20} className="shrink-0 text-amber-200 sm:h-[22px] sm:w-[22px]" /> {labels.availabilityTitle}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Ajoutez les créneaux que les clients peuvent réserver. Une fois réservé, un créneau disparaît automatiquement de leur calendrier.</p>
             </div>
             <AvailabilityConfiguration availabilityDraft={availabilityDraft} setAvailabilityDraft={setAvailabilityDraft} barbers={barbersForSelectedSalon} allSlots={availabilitySlots.filter((slot) => slot.salon_id === availabilityDraft.salonId)} selectedBarberId={selectedBarberId} setSelectedBarberId={setSelectedBarberId} selectedSlotTimes={selectedSlotTimes} toggleSuggestedTime={toggleSuggestedTime} onSubmitSlots={handleAddAvailability} isSavingSlots={isSavingAvailability} existingSlots={selectedBarberSlots} onRemoveSlot={deactivateAvailability} onToggleSlot={toggleAvailabilityCell} onDeactivateBarber={deactivateBarber} barberDraft={barberDraft} setBarberDraft={setBarberDraft} barberFile={barberFile} setBarberFile={setBarberFile} onSubmitBarber={handleAddBarber} isSavingBarber={isSavingBarber} />
@@ -1125,7 +1125,7 @@ function LogoStylePreview({ style }) {
 }
 
 function DashboardTab({ active, onClick, icon, children }) {
-  return <button type="button" onClick={onClick} className={`flex flex-1 items-center justify-center gap-2 border px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] transition sm:flex-none ${active ? 'border-amber-200 bg-amber-200 text-zinc-950' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-100'}`}>{icon}{children}</button>
+  return <button type="button" onClick={onClick} className={`flex min-w-0 items-center justify-center gap-1.5 border px-2 py-3 text-center text-[9px] font-bold uppercase leading-tight tracking-[0.06em] transition sm:flex-none sm:gap-2 sm:px-4 sm:text-[10px] sm:tracking-[0.14em] ${active ? 'border-amber-200 bg-amber-200 text-zinc-950' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-100'}`}>{icon}{children}</button>
 }
 
 function DashboardField({ label, children }) {
