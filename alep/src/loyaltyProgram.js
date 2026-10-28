@@ -1,7 +1,7 @@
 export const DEFAULT_LOYALTY_PROGRAM = {
   loyalty_visits_for_reward: 10,
   loyalty_reward_title: 'Votre {visits}e coupe offerte',
-  loyalty_reward_description: 'À chaque visite avec une coupe, vos points sont ajoutés à votre carte numérique dans l’application Alep Salon. Tout est sur votre téléphone : pas de carte papier ni de tampons à garder.',
+  loyalty_reward_description: 'À chaque visite avec une coupe, vos points sont ajoutés directement dans l’application mobile Alep Salon. Suivez votre progression sur votre téléphone, sans carte papier à garder : après {points} points, votre {visits}e coupe est offerte.',
   loyalty_birthday_title: 'Cadeau d’anniversaire',
   loyalty_birthday_description: 'Pendant le mois de votre anniversaire, nous vous offrons une coupe. Une fois par an, si votre date de naissance est enregistrée chez nous.',
   loyalty_referral_title: 'Inviter des amis',
@@ -21,18 +21,36 @@ export function getLoyaltyProgramSteps(data = {}) {
   if (Array.isArray(data.loyalty_steps)) {
     return data.loyalty_steps.map((step, index) => ({
       id: String(step.id ?? `step-${index + 1}`),
-      title: String(step.title ?? ''),
-      description: String(step.description ?? ''),
+      title: normalizeLegacyStepTitle(String(step.id ?? `step-${index + 1}`), String(step.title ?? '')),
+      description: normalizeLegacyStepDescription(String(step.id ?? `step-${index + 1}`), String(step.description ?? '')),
       icon: String(step.icon ?? 'sparkles'),
     }))
   }
 
   return LOYALTY_PROGRAM_CARDS.map(({ id, titleKey, descriptionKey, icon }) => ({
     id,
-    title: data[titleKey] ?? DEFAULT_LOYALTY_PROGRAM[titleKey],
-    description: data[descriptionKey] ?? DEFAULT_LOYALTY_PROGRAM[descriptionKey],
+    title: normalizeLegacyStepTitle(id, data[titleKey] ?? DEFAULT_LOYALTY_PROGRAM[titleKey]),
+    description: normalizeLegacyStepDescription(id, data[descriptionKey] ?? DEFAULT_LOYALTY_PROGRAM[descriptionKey]),
     icon,
   }))
+}
+
+const legacyStampWord = /\b(?:tampon(?:s)?|stempel|stamps?)\b/i
+
+function normalizeLegacyStepTitle(id, title) {
+  if (!legacyStampWord.test(title)) return title
+  if (id === 'reward') return 'Vos points dans l’application Alep Salon'
+  if (id === 'referral') return 'Inviter des amis et gagner des points'
+  if (id === 'review') return 'Votre avis récompensé'
+  return 'Suivez vos points dans l’application Alep Salon'
+}
+
+function normalizeLegacyStepDescription(id, description) {
+  if (!legacyStampWord.test(description)) return description
+  if (id === 'reward') return DEFAULT_LOYALTY_PROGRAM.loyalty_reward_description
+  if (id === 'referral') return DEFAULT_LOYALTY_PROGRAM.loyalty_referral_description
+  if (id === 'review') return DEFAULT_LOYALTY_PROGRAM.loyalty_review_description
+  return 'Vos points sont ajoutés directement dans l’application mobile Alep Salon. Suivez votre progression sur votre téléphone, sans carte papier.'
 }
 
 const OLD_REWARD_DESCRIPTIONS = [
