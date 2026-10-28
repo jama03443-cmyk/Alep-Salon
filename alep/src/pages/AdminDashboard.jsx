@@ -20,7 +20,6 @@ import { BARBER_ASSETS_BUCKET, SERVICE_ASSETS_BUCKET, supabase } from '../supaba
 import { BODY_COLOR_OPTIONS, BUTTON_COLOR_OPTIONS, FOOTER_COLOR_OPTIONS, LOGO_STYLE_OPTIONS } from '../siteBranding'
 import { DEFAULT_LOYALTY_PROGRAM, getLoyaltyProgramSettings, getLoyaltyProgramSteps } from '../loyaltyProgram'
 import BrandLogo from '../BrandLogo'
-import AdminPushNotifications from '../AdminPushNotifications'
 
 const salonNames = {
   bienne: 'Bienne',
@@ -195,7 +194,7 @@ function getStorageObjectPath(publicUrl, bucket) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
-  const { refreshAuth, session } = useAuth()
+  const { refreshAuth } = useAuth()
   const [language, setLanguage] = useState(() => window.localStorage.getItem('alep-admin-language') === 'DE' ? 'DE' : 'FR')
   const [activeTab, setActiveTab] = useState('reservations')
   const [reservations, setReservations] = useState([])
@@ -1140,8 +1139,6 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
-
-            <AdminPushNotifications language={language} userId={session?.user?.id} />
 
             {isLoading ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Chargement des réservations…</p> : reservationGroups.length === 0 ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Aucune réservation pour le moment.</p> : <div className="space-y-6">{reservationGroups.map((group) => <ReservationGroup key={group.id} group={group} pricesByService={pricesByService} onDeleteReservation={deleteReservation} deletingReservationId={deletingReservationId} language={language} />)}</div>}
           </section>
