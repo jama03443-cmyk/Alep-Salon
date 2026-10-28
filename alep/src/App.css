@@ -10,23 +10,6 @@
 .site-intro-logo img { width: min(82vw, 560px); height: auto; max-width: none; }
 .site-intro-logo > span { transform: scale(1.8); }
 
-.admin-intro-logo {
-  display: grid;
-  width: min(100%, 650px);
-  min-height: clamp(150px, 28vh, 250px);
-  place-items: center;
-  border: 1px solid rgb(217 173 59 / 24%);
-  border-radius: 24px;
-  background: radial-gradient(ellipse at center, rgb(55 48 37 / 56%), rgb(9 9 11 / 0%) 72%);
-}
-.admin-intro-logo img { display: block; filter: drop-shadow(0 8px 24px rgb(0 0 0 / 48%)); }
-.admin-intro-logo .brand-logo-wordmark > span:first-child { font-size: clamp(2.75rem, 11vw, 5rem); }
-.admin-intro-logo .brand-logo-wordmark > span:last-child { margin-top: 0.65rem; font-size: clamp(0.75rem, 2.8vw, 1rem); }
-.admin-intro-logo .brand-logo-monogram > span:first-child { width: clamp(3.75rem, 15vw, 5.5rem); height: clamp(3.75rem, 15vw, 5.5rem); }
-.admin-intro-logo .brand-logo-monogram > span:first-child svg { width: 48%; height: 48%; }
-.admin-intro-logo .brand-logo-monogram > span:last-child { font-size: clamp(1.1rem, 4.4vw, 1.75rem); }
-.admin-intro-logo .brand-logo-monogram > span:last-child span { margin-top: 0.4rem; font-size: clamp(0.7rem, 2.4vw, 0.9rem); }
-.admin-intro-label { text-shadow: 0 2px 14px rgb(217 173 59 / 45%); }
 
 .site-shell .bg-zinc-950 { background-color: var(--site-body-color, #fff); }
 .site-shell .bg-zinc-950\/80 { background-color: color-mix(in srgb, var(--site-body-color, #fff) 88%, transparent); }
