@@ -24,6 +24,31 @@ import './App.css'
 
 gsap.registerPlugin(ScrollTrigger)
 
+const CLIENT_PWA_INTRO_KEY = 'alep-client-pwa-intro-seen'
+
+function isStandaloneClientPwa() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true
+}
+
+function shouldShowClientIntro() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false
+  if (!isStandaloneClientPwa()) return true
+  try {
+    return window.localStorage.getItem(CLIENT_PWA_INTRO_KEY) !== 'true'
+  } catch {
+    return true
+  }
+}
+
+function rememberClientIntro() {
+  if (!isStandaloneClientPwa()) return
+  try {
+    window.localStorage.setItem(CLIENT_PWA_INTRO_KEY, 'true')
+  } catch {
+    // The intro can still finish normally when storage is unavailable.
+  }
+}
+
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const LoginScreen = lazy(() => import('./pages/LoginScreen'))
 const LoyaltyScreen = lazy(() => import('./pages/LoyaltyScreen'))
@@ -229,7 +254,7 @@ const fallbackSalons = [
 
 function PublicSite() {
   const [language, setLanguage] = useState('FR')
-  const [introVisible, setIntroVisible] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const [introVisible, setIntroVisible] = useState(() => shouldShowClientIntro())
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [servicesMenuOpen, setServicesMenuOpen] = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
@@ -271,10 +296,10 @@ function PublicSite() {
   }, [language])
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      return undefined
-    }
+    if (!introVisible) return undefined
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
 
+    rememberClientIntro()
     const introTimeline = gsap.timeline({ onComplete: () => setIntroVisible(false) })
     introTimeline
       .fromTo('.site-intro-logo',
@@ -286,11 +311,10 @@ function PublicSite() {
         { y: 0, opacity: 1, duration: 0.65, ease: 'power3.out' },
         '+=0.35',
       )
-      .to('.site-intro-logo', { opacity: 1, duration: 0.45 })
       .to('.site-intro', { yPercent: -100, duration: 0.8, ease: 'power4.inOut' }, '+=0.2')
 
     return () => introTimeline.kill()
-  }, [])
+  }, [introVisible])
 
   useEffect(() => {
     if (introVisible) return undefined
