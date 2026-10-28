@@ -766,13 +766,13 @@ function PublicSite() {
           <div data-scroll-parallax className="hero-photo absolute inset-0 -z-20 bg-[url('/alep-team-hero.webp')] bg-cover bg-[center_42%]" style={managedHeroImageUrl ? { backgroundImage: `url("${managedHeroImageUrl}")` } : undefined} />
           <div className="hero-shade absolute inset-0 -z-10" />
           <div className="hero-grid absolute inset-0 -z-10" />
+          <div className={`absolute left-5 top-[108px] z-10 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white shadow-lg backdrop-blur-sm sm:left-8 lg:left-10 ${salonStatus.isOpen ? 'border-[#25D366] bg-[#25D366]/80 shadow-emerald-950/25' : 'border-red-500 bg-red-600/80 shadow-red-950/25'}`}>
+            <span className="h-2 w-2 shrink-0 rounded-full bg-white" />
+            <span>{salonStatus.isOpen ? (language === 'FR' ? 'Ouvert' : 'Geöffnet') : (language === 'FR' ? 'Fermé' : 'Geschlossen')}</span>
+            <span className="text-xs font-semibold normal-case tracking-normal">· {salonStatus.detail}</span>
+          </div>
           <div className="relative mx-auto flex w-full max-w-[1440px] items-center">
             <div className="hero-copy relative z-10 max-w-2xl py-12 lg:py-0">
-              <div className={`mb-8 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white shadow-lg backdrop-blur-sm ${salonStatus.isOpen ? 'border-[#25D366] bg-[#25D366]/80 shadow-emerald-950/25' : 'border-red-500 bg-red-600/80 shadow-red-950/25'}`}>
-                <span className="h-2 w-2 shrink-0 rounded-full bg-white" />
-                <span>{salonStatus.isOpen ? (language === 'FR' ? 'Ouvert' : 'Geöffnet') : (language === 'FR' ? 'Fermé' : 'Geschlossen')}</span>
-                <span className="text-xs font-semibold normal-case tracking-normal">· {salonStatus.detail}</span>
-              </div>
               <h1 data-hero-reveal className="hero-title font-display text-[clamp(5rem,12vw,10rem)] font-black uppercase leading-[0.82] tracking-[-0.075em] text-white">
                 Alep<br />Salon
               </h1>
