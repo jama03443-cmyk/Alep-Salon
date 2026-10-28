@@ -74,6 +74,7 @@ export default function AdminDashboard() {
   const [siteButtonColor, setSiteButtonColor] = useState(BUTTON_COLOR_OPTIONS[0].value)
   const [siteLogoStyle, setSiteLogoStyle] = useState('classic')
   const [loyaltyProgram, setLoyaltyProgram] = useState(DEFAULT_LOYALTY_PROGRAM)
+  const [isRewardThresholdDirty, setIsRewardThresholdDirty] = useState(false)
   const [loyaltySteps, setLoyaltySteps] = useState(() => getLoyaltyProgramSteps(DEFAULT_LOYALTY_PROGRAM))
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingService, setIsSavingService] = useState(false)
@@ -83,6 +84,7 @@ export default function AdminDashboard() {
   const [serviceDeleteId, setServiceDeleteId] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isSavingBranding, setIsSavingBranding] = useState(false)
+  const [isSavingRewardThreshold, setIsSavingRewardThreshold] = useState(false)
   const [isSavingAvailability, setIsSavingAvailability] = useState(false)
   const [isSavingBarber, setIsSavingBarber] = useState(false)
   const [isClearingReservations, setIsClearingReservations] = useState(false)
@@ -184,6 +186,7 @@ export default function AdminDashboard() {
         setSiteButtonColor(heroSettingsResult.data?.button_color ?? BUTTON_COLOR_OPTIONS[0].value)
         setSiteLogoStyle(heroSettingsResult.data?.logo_style ?? 'classic')
         setLoyaltyProgram(getLoyaltyProgramSettings(heroSettingsResult.data))
+        setIsRewardThresholdDirty(false)
         setLoyaltySteps(getLoyaltyProgramSteps(heroSettingsResult.data))
       }
     }
@@ -781,6 +784,46 @@ export default function AdminDashboard() {
     setIsUploading(false)
   }
 
+  const saveRewardThreshold = async () => {
+    if (!supabase || !isRewardThresholdDirty || isSavingRewardThreshold) return false
+    const rewardVisits = Number(loyaltyProgram.loyalty_visits_for_reward)
+    if (!Number.isInteger(rewardVisits) || rewardVisits < 2 || rewardVisits > 100) {
+      setFeedback({ type: 'error', text: 'Le nombre de coupes avant la récompense doit être compris entre 2 et 100.' })
+      return false
+    }
+
+    setIsSavingRewardThreshold(true)
+    setFeedback(null)
+    try {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .update({ loyalty_visits_for_reward: rewardVisits })
+        .eq('id', true)
+        .select('loyalty_visits_for_reward')
+        .maybeSingle()
+
+      if (error || !data) {
+        setFeedback({ type: 'error', text: 'Le seuil n’a pas été enregistré. Vérifiez loyalty-program-settings-migration.sql et les droits admin Supabase.' })
+        return false
+      }
+
+      setLoyaltyProgram((current) => ({ ...current, loyalty_visits_for_reward: data.loyalty_visits_for_reward }))
+      setIsRewardThresholdDirty(false)
+      setFeedback({ type: 'success', text: `Seuil fidélité enregistré : ${data.loyalty_visits_for_reward} coupes.` })
+      return true
+    } catch {
+      setFeedback({ type: 'error', text: 'Erreur réseau : le seuil de fidélité n’a pas pu être enregistré.' })
+      return false
+    } finally {
+      setIsSavingRewardThreshold(false)
+    }
+  }
+
+  const handleRefreshDashboard = async () => {
+    if (isRewardThresholdDirty && !(await saveRewardThreshold())) return
+    await loadDashboard({ clearFeedback: true })
+  }
+
   const handleSaveBranding = async () => {
     if (!supabase || isSavingBranding) return
     const rewardVisits = Number(loyaltyProgram.loyalty_visits_for_reward)
@@ -798,7 +841,8 @@ export default function AdminDashboard() {
     if (error) {
       setFeedback({ type: 'error', text: 'Impossible d’enregistrer les réglages. Vérifiez que hero-image-migration.sql, loyalty-program-settings-migration.sql et loyalty-steps-migration.sql ont été exécutés dans Supabase.' })
     } else {
-      setFeedback({ type: 'success', text: 'Les couleurs et le logo ont été enregistrés.' })
+      setFeedback({ type: 'success', text: 'Les réglages et le programme de fidélité ont été enregistrés.' })
+      setIsRewardThresholdDirty(false)
       await loadDashboard()
     }
     setIsSavingBranding(false)
@@ -1083,8 +1127,9 @@ export default function AdminDashboard() {
               <p className="mt-2 text-sm leading-6 text-zinc-500">Le seuil et les textes ci-dessous seront affichés sur la page fidélité des clients. Utilisez {`{visits}`} pour afficher le nombre de coupes et {`{points}`} pour les points nécessaires avant la récompense.</p>
               <div className="mt-7 max-w-sm">
                 <DashboardField label="Nombre de coupes avant la récompense">
-                  <input required type="number" min="2" max="100" value={loyaltyProgram.loyalty_visits_for_reward} onChange={(event) => setLoyaltyProgram((current) => ({ ...current, loyalty_visits_for_reward: event.target.value }))} className="dashboard-input" />
+                  <input required type="number" min="2" max="100" value={loyaltyProgram.loyalty_visits_for_reward} onChange={(event) => { setLoyaltyProgram((current) => ({ ...current, loyalty_visits_for_reward: event.target.value })); setIsRewardThresholdDirty(true) }} onBlur={(event) => { if (isRewardThresholdDirty && !event.relatedTarget?.dataset.saveLoyaltyProgram) void saveRewardThreshold() }} className="dashboard-input" />
                 </DashboardField>
+                <p className="mt-2 text-xs leading-5 text-zinc-500">Le nombre est enregistré automatiquement quand vous quittez le champ.</p>
               </div>
               <div className="mt-6 grid gap-5 md:grid-cols-2">
                 {loyaltySteps.map((step, index) => (
@@ -1103,13 +1148,13 @@ export default function AdminDashboard() {
                 ))}
               </div>
               <button type="button" className="button-ghost mt-5 w-full justify-center" onClick={() => setLoyaltySteps((current) => [...current, { id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, title: 'Nouvelle étape', description: 'Décrivez cette étape du programme de fidélité.', icon: 'sparkles' }])}><Plus size={16} />Ajouter une étape</button>
-              <button type="button" className="button-primary mt-6 w-full" onClick={() => void handleSaveBranding()} disabled={isSavingBranding}><Check size={16} />{isSavingBranding ? 'Enregistrement…' : 'Enregistrer le programme de fidélité'}</button>
+              <button type="button" data-save-loyalty-program="true" className="button-primary mt-6 w-full" onClick={() => void handleSaveBranding()} disabled={isSavingBranding || isSavingRewardThreshold}><Check size={16} />{isSavingBranding ? 'Enregistrement…' : 'Enregistrer le programme de fidélité'}</button>
             </article>
           </section>
         )}
 
         <div className="mt-8 flex justify-end">
-          <button type="button" className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition hover:text-amber-200" onClick={() => void loadDashboard({ clearFeedback: true })} disabled={isLoading}>
+          <button type="button" className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition hover:text-amber-200" onClick={() => void handleRefreshDashboard()} disabled={isLoading || isSavingBranding || isSavingRewardThreshold}>
             <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Actualiser les données
           </button>
         </div>
