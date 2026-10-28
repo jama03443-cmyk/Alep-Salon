@@ -1400,19 +1400,19 @@ function AdminIntroOverlay() {
     timeline
       .fromTo('.admin-intro-logo', { y: -18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.55, ease: 'power3.out' })
       .fromTo('.admin-intro-label', { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: 'power3.out' }, '-=0.05')
-      .to('.admin-intro', { yPercent: -100, duration: 0.65, ease: 'power4.inOut' }, '+=0.45')
+      .to('.admin-intro', { yPercent: -100, duration: 0.65, ease: 'power4.inOut' }, '+=0.85')
     return () => timeline.kill()
   }, [visible])
 
   if (!visible) return null
 
   return (
-    <div className="admin-intro fixed inset-0 z-[250] flex items-center justify-center bg-black" aria-hidden="true">
-      <div className="flex flex-col items-center gap-5">
+    <div className="admin-intro fixed inset-0 z-[250] flex items-center justify-center bg-black px-5" aria-hidden="true">
+      <div className="flex w-full flex-col items-center gap-6">
         <div className="admin-intro-logo">
-          <BrandLogo style={logoStyle} className={logoStyle === 'classic' ? 'h-auto w-[min(82vw,420px)] max-w-none' : ''} />
+          <BrandLogo style={logoStyle} className={logoStyle === 'classic' ? 'h-auto w-[min(88vw,560px)] max-w-none' : 'admin-splash-brand'} />
         </div>
-        <p className="admin-intro-label font-display text-sm font-bold uppercase tracking-[0.48em] text-amber-200 sm:text-base">ADMIN</p>
+        <p className="admin-intro-label font-display text-base font-bold uppercase tracking-[0.52em] text-amber-200 sm:text-lg">ADMIN</p>
       </div>
     </div>
   )
