@@ -15,6 +15,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../auth/useAuth'
 import { BARBER_ASSETS_BUCKET, SERVICE_ASSETS_BUCKET, supabase } from '../supabaseClient'
 import { BODY_COLOR_OPTIONS, BUTTON_COLOR_OPTIONS, FOOTER_COLOR_OPTIONS, LOGO_STYLE_OPTIONS } from '../siteBranding'
@@ -1230,7 +1231,17 @@ export default function AdminDashboard() {
             <article className="border border-zinc-800 bg-zinc-900/35 p-5 sm:p-7">
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Alep Salon</p>
               <h2 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">{language === 'DE' ? 'Kunden-App installieren' : 'Installer l’application client'}</h2>
-              <img src="/qr-client.svg" alt={language === 'DE' ? 'QR-Code zur Alep Salon Kunden-App' : 'QR code de l’application client Alep Salon'} className="mx-auto mt-6 aspect-square w-full max-w-[340px] border border-zinc-700 bg-white p-2" />
+              <div className="mx-auto mt-6 flex aspect-square w-full max-w-[340px] items-center justify-center border border-zinc-700 bg-white p-2">
+                <QRCodeSVG
+                  value="https://alep-salon-seven.vercel.app/"
+                  size={320}
+                  level="H"
+                  includeMargin
+                  title={language === 'DE' ? 'QR-Code zur Alep Salon Kunden-App' : 'QR code de l’application client Alep Salon'}
+                  imageSettings={{ src: '/pwa-icon-192.png', width: 72, height: 72, excavate: true }}
+                  className="h-full w-full"
+                />
+              </div>
               <a href="/qr-client.svg" download="alep-salon-qr-client.svg" className="button-ghost mt-5 w-full justify-center">
                 {language === 'DE' ? 'QR-Code herunterladen' : 'Télécharger le QR code'}
               </a>
