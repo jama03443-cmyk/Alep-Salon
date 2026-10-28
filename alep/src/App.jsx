@@ -733,7 +733,7 @@ function PublicSite() {
               <div className={`mb-10 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white shadow-lg ${salonStatus.isOpen ? 'border-[#25D366] bg-[#25D366] shadow-emerald-950/25' : 'border-red-500 bg-red-600 shadow-red-950/25'}`}>
                 <span className="h-2 w-2 shrink-0 rounded-full bg-white" />
                 <span>{salonStatus.isOpen ? (language === 'FR' ? 'Ouvert' : 'Geöffnet') : (language === 'FR' ? 'Fermé' : 'Geschlossen')}</span>
-                <span className="font-semibold normal-case tracking-normal">· {salonStatus.detail}</span>
+                <span className="text-xs font-semibold normal-case tracking-normal">· {salonStatus.detail}</span>
               </div>
               <h1 data-hero-reveal className="hero-title font-display text-[clamp(5rem,12vw,10rem)] font-black uppercase leading-[0.82] tracking-[-0.075em] text-white">
                 Alep<br />Salon
