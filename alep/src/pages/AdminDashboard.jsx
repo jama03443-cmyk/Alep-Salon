@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Children, cloneElement, Fragment, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Camera,
   CalendarDays,
@@ -29,11 +29,144 @@ const salonNames = {
 const categories = ['Coupes', 'Barbe', 'Soins']
 const suggestedTimes = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00']
 
-function formatDate(date) {
+const adminGermanCopy = {
+  'langue': 'Sprache', 'chargement des reservations…': 'Buchungen werden geladen…', 'aucune reservation pour le moment.': 'Zurzeit gibt es keine Buchungen.',
+  'client': 'Kunde', 'clients': 'Kunden', 'code membre': 'Mitgliedscode', 'points': 'Punkte', 'derniere activite': 'Letzte Aktivität', 'actions': 'Aktionen',
+  'validation de visite': 'Besuch bestätigen', 'arreter la camera': 'Kamera stoppen', 'code qr ou nom du client': 'QR-Code oder Name des Kunden',
+  'scanner un qr code': 'QR-Code scannen',
+  'scannez ou collez le code': 'Code scannen oder einfügen', 'trouver': 'Suchen', 'client fidelite': 'Treueprogramm-Kunde', 'non disponible': 'Nicht verfügbar',
+  'points actuels': 'Aktuelle Punkte', 'valider la visite · +1 point': 'Besuch bestätigen · +1 Punkt', 'chargement des cartes…': 'Karten werden geladen…',
+  'aucune carte trouvee.': 'Keine Karte gefunden.', 'e-mail non disponible': 'E-Mail nicht verfügbar', 'historique client': 'Kundenverlauf',
+  'remettre a zero': 'Punkte zurücksetzen', 'chargement de l’historique…': 'Verlauf wird geladen…', 'aucun point enregistre pour ce client.': 'Für diesen Kunden sind keine Punkte gespeichert.',
+  'ajoutez les creneaux que les clients peuvent reserver. une fois reserve, un creneau disparait automatiquement de leur calendrier.': 'Fügen Sie buchbare Zeitfenster hinzu. Sobald ein Termin gebucht ist, wird er automatisch aus dem Kalender entfernt.',
+  'nouveau creneau': 'Neuer Termin', 'salon': 'Salon', 'date': 'Datum', 'heure': 'Uhrzeit', 'statut': 'Status', 'action': 'Aktion',
+  'chargement…': 'Wird geladen…', 'aucun creneau configure.': 'Keine Zeitfenster eingerichtet.', 'reserve': 'Gebucht', 'disponible': 'Verfügbar', 'ferme': 'Geschlossen', 'retirer': 'Entfernen',
+  'prestations': 'Dienstleistungen', 'ajouter une prestation': 'Dienstleistung hinzufügen', 'categorie': 'Kategorie', 'nom de la prestation': 'Name der Dienstleistung',
+  'ex. coupe enfant': 'z. B. Kinderhaarschnitt', 'prix affiche': 'Angezeigter Preis', 'ajouter la prestation': 'Dienstleistung hinzufügen',
+  'galerie des services': 'Galerie der Dienstleistungen', 'gerer les photos': 'Fotos verwalten',
+  'ajoutez une photo a chaque service. elle apparaitra sur la page services du site client. jpg, png ou webp · 5 mo maximum.': 'Fügen Sie jeder Dienstleistung ein Foto hinzu. Es erscheint auf der Services-Seite der Kundenwebsite. JPG, PNG oder WebP · maximal 5 MB.',
+  'aucune photo': 'Kein Foto', 'titre de la photo (facultatif)': 'Fototitel (optional)', 'ex. coupe degradee': 'z. B. Fade-Haarschnitt',
+  'televersement…': 'Wird hochgeladen…', 'remplacer': 'Ersetzen', 'ajouter une photo': 'Foto hinzufügen', 'supprimer': 'Löschen',
+  'enregistrement…': 'Wird gespeichert…', 'enregistrer le titre': 'Titel speichern', 'suppression…': 'Wird gelöscht…', 'supprimer la prestation': 'Dienstleistung löschen',
+  'aucun service a gerer pour le moment.': 'Zurzeit gibt es keine Dienstleistungen zu verwalten.', 'visuel du site': 'Website-Bild', 'photo hero section': 'Hero-Bild',
+  'cette image apparait en arriere-plan du hero. vous pouvez la remplacer a tout moment.': 'Dieses Bild erscheint im Hintergrund des Hero-Bereichs. Sie können es jederzeit ersetzen.',
+  'nouvelle photo - jpg, png ou webp - 5 mo max': 'Neues Foto – JPG, PNG oder WebP – max. 5 MB', 'televerser et remplacer la photo hero': 'Hero-Foto hochladen und ersetzen',
+  'apparence du site client': 'Darstellung der Kundenwebsite', 'couleurs et logo': 'Farben und Logo',
+  'choisissez separement le fond du site client, la couleur du footer, les boutons et le style du logo.': 'Wählen Sie Hintergrund, Footer-Farbe, Schaltflächen und Logostil der Kundenwebsite separat aus.',
+  'couleur du fond du site': 'Hintergrundfarbe der Website', 'couleur du footer': 'Footer-Farbe', 'couleur des boutons': 'Schaltflächenfarbe', 'style du logo': 'Logostil',
+  'enregistrer le design': 'Design speichern', 'programme de fidelite': 'Treueprogramm', 'comment ca marche': 'So funktioniert es',
+  'le seuil et les textes ci-dessous seront affiches sur la page fidelite des clients. utilisez {visits} pour afficher le nombre de coupes et {points} pour les points necessaires avant la recompense.': 'Der Schwellenwert und die folgenden Texte erscheinen auf der Treueprogramm-Seite. Verwenden Sie {visits} für die Anzahl der Haarschnitte und {points} für die noch fehlenden Punkte bis zur Prämie.',
+  'nombre de coupes avant la recompense': 'Anzahl Haarschnitte bis zur Prämie', 'le nombre est enregistre automatiquement quand vous quittez le champ.': 'Die Zahl wird automatisch gespeichert, sobald Sie das Feld verlassen.',
+  'titre': 'Titel', 'explication': 'Erklärung', 'ajouter une etape': 'Schritt hinzufügen', 'enregistrer le programme de fidelite': 'Treueprogramm speichern', 'actualiser les donnees': 'Daten aktualisieren',
+  'l’equipe': 'Team', 'ajouter un barbier': 'Barbier hinzufügen', 'nom': 'Name', 'photo': 'Foto', 'planning': 'Planung', 'configurer les creneaux': 'Zeitfenster konfigurieren',
+  'choisir le barbier': 'Barbier auswählen',
+  'retirer le barbier selectionne': 'Ausgewählten Barbier entfernen', 'heures disponibles': 'Verfügbare Zeiten', 'ajout…': 'Wird hinzugefügt…',
+  'ouvrir ce creneau': 'Dieses Zeitfenster öffnen', 'creneaux de cette date': 'Zeitfenster für dieses Datum', 'choisissez un barbier.': 'Wählen Sie einen Barbier aus.',
+  'vert : disponible. jaune : reserve. cliquez sur un creneau vert pour le retirer.': 'Grün: verfügbar. Gelb: gebucht. Klicken Sie auf ein grünes Zeitfenster, um es zu entfernen.',
+  'tableau des disponibilites par barbier': 'Verfügbarkeitsübersicht nach Barbier', 'chaque colonne est un barbier. un meme horaire peut etre ouvert et reserve pour chaque barbier : a 10:00, trois barbiers peuvent donc recevoir trois clients.': 'Jede Spalte steht für einen Barbier. Derselbe Zeitpunkt kann für jeden Barbier verfügbar sein: Um 10:00 Uhr können also drei Barbier drei Kunden empfangen.',
+  'ajoutez des barbiers pour afficher le planning.': 'Fügen Sie Barbier hinzu, um den Plan anzuzeigen.', 'vert : disponible. jaune : reserve. cliquez sur une case pour selectionner ce barbier et modifier ses creneaux.': 'Grün: verfügbar. Gelb: gebucht. Klicken Sie auf ein Feld, um den Barbier auszuwählen und seine Zeitfenster zu ändern.',
+  'barbiers actifs': 'Aktive Barbier', 'ajoutez un barbier pour commencer.': 'Fügen Sie einen Barbier hinzu, um zu beginnen.', 'planning par barbier': 'Planung nach Barbier', 'creneaux par barbier': 'Zeitfenster nach Barbier',
+  'cliquez sur une case vide : elle devient verte et disponible. cliquez sur une case verte : elle est fermee. une case jaune est deja reservee. chaque barbier possede ses propres creneaux, donc trois barbiers peuvent recevoir trois clients a la meme heure.': 'Klicken Sie auf ein leeres Feld: Es wird grün und verfügbar. Klicken Sie auf ein grünes Feld: Es wird geschlossen. Ein gelbes Feld ist bereits gebucht. Jeder Barbier hat eigene Zeitfenster; so können drei Barbier zur gleichen Zeit drei Kunden empfangen.',
+  'barbier': 'Barbier', 'telephone': 'Telefon', 'prestation': 'Dienstleistung', 'prix': 'Preis', 'confirme': 'Bestätigt', 'annule': 'Storniert', 'en attente': 'Ausstehend',
+  'rendez-vous': 'Termin', 'supprimer le rendez-vous': 'Termin löschen', 'mois precedent': 'Vorheriger Monat', 'mois suivant': 'Nächster Monat', 'horaires': 'Öffnungszeiten',
+  'aucune carte ne correspond a ce code ou ce nom.': 'Keine Karte stimmt mit diesem Code oder Namen überein.', 'carte trouvee.': 'Karte gefunden.',
+  '1 point ajoute au client.': 'Dem Kunden wurde 1 Punkt hinzugefügt.', 'la visite ne peut pas etre validee.': 'Der Besuch konnte nicht bestätigt werden.',
+  'le nombre de coupes avant la recompense doit etre compris entre 2 et 100.': 'Die Anzahl der Haarschnitte bis zur Prämie muss zwischen 2 und 100 liegen.',
+  'seuil fidelite enregistre :': 'Treue-Schwellenwert gespeichert:',
+  'coupes': 'Haarschnitte', 'barbe': 'Bart', 'soins': 'Pflege', 'ouvert': 'Offen', 'ouverts': 'Offen',
+  'rendez-vous a venir': 'bevorstehende Termine', 'visite': 'Besuch',
+  'supprimer cette etape': 'Diesen Schritt löschen', 'supprimer le rendez-vous de': 'Termin löschen für', 'historique client de': 'Kundenverlauf von', 'remettre a zero le compteur de': 'Punktestand zurücksetzen für',
+  'les donnees ne peuvent pas etre chargees. verifiez les droits administrateur rls.': 'Die Daten konnten nicht geladen werden. Bitte prüfen Sie die RLS-Adminrechte.',
+  'le scanner qr n’est pas pris en charge par ce navigateur. utilisez la saisie manuelle du code.': 'Der QR-Code-Scanner wird von diesem Browser nicht unterstützt. Bitte geben Sie den Code manuell ein.',
+  'impossible d’acceder a la camera. autorisez la camera ou saisissez le code manuellement.': 'Kein Zugriff auf die Kamera. Erlauben Sie den Zugriff oder geben Sie den Code manuell ein.',
+  'la modification des points a echoue.': 'Die Punkte konnten nicht geändert werden.', 'l’historique de ce client ne peut pas etre charge.': 'Der Verlauf dieses Kunden konnte nicht geladen werden.',
+  'le compteur de points n’a pas pu etre remis a zero.': 'Der Punktestand konnte nicht zurückgesetzt werden.', 'le rendez-vous n’a pas pu etre supprime.': 'Der Termin konnte nicht gelöscht werden.',
+  'le rendez-vous a ete supprime et son creneau libere.': 'Der Termin wurde gelöscht und das Zeitfenster freigegeben.', 'impossible d’ajouter cette prestation.': 'Diese Dienstleistung konnte nicht hinzugefügt werden.',
+  'la prestation a ete ajoutee.': 'Die Dienstleistung wurde hinzugefügt.', 'impossible d’enregistrer le titre de la photo.': 'Der Fototitel konnte nicht gespeichert werden.',
+  'choisissez une image jpg, png ou webp de 5 mo maximum.': 'Wählen Sie ein JPG-, PNG- oder WebP-Bild mit maximal 5 MB aus.',
+  'impossible de televerser cette image. verifiez la migration des images de services.': 'Das Bild konnte nicht hochgeladen werden. Bitte prüfen Sie die Migration der Dienstleistungsbilder.',
+  'l’image a ete televersee, mais le service n’a pas pu etre mis a jour.': 'Das Bild wurde hochgeladen, aber die Dienstleistung konnte nicht aktualisiert werden.',
+  'impossible de retirer cette image.': 'Dieses Bild konnte nicht entfernt werden.', 'choisissez un barbier et au moins une heure.': 'Wählen Sie einen Barbier und mindestens eine Uhrzeit aus.',
+  'un ou plusieurs creneaux existent deja ou ne peuvent pas etre ajoutes.': 'Ein oder mehrere Zeitfenster existieren bereits oder konnten nicht hinzugefügt werden.',
+  'creneaux ajoutes. les clients peuvent maintenant les reserver.': 'Zeitfenster hinzugefügt. Kunden können jetzt buchen.',
+  'ajoutez le nom et une photo du barbier.': 'Geben Sie den Namen des Barbiers ein und fügen Sie ein Foto hinzu.',
+  'utilisez une image jpg, png ou webp de 5 mo maximum.': 'Verwenden Sie ein JPG-, PNG- oder WebP-Bild mit maximal 5 MB.',
+  'le televersement de la photo a echoue.': 'Das Foto konnte nicht hochgeladen werden.', 'le barbier ne peut pas etre ajoute.': 'Der Barbier konnte nicht hinzugefügt werden.',
+  'barbier ajoute. vous pouvez maintenant ouvrir ses creneaux.': 'Barbier hinzugefügt. Sie können jetzt seine Zeitfenster öffnen.',
+  'ce creneau ne peut pas etre retire.': 'Dieses Zeitfenster konnte nicht entfernt werden.', 'creneau retire des disponibilites.': 'Zeitfenster aus den Verfügbarkeiten entfernt.',
+  'un creneau reserve ne peut pas etre modifie.': 'Ein gebuchtes Zeitfenster kann nicht geändert werden.',
+  'le creneau ne peut pas etre modifie. actualisez puis reessayez.': 'Das Zeitfenster konnte nicht geändert werden. Aktualisieren Sie die Seite und versuchen Sie es erneut.',
+  'creneau ferme.': 'Zeitfenster geschlossen.', 'creneau disponible.': 'Zeitfenster verfügbar.', 'le barbier ne peut pas etre retire.': 'Der Barbier konnte nicht entfernt werden.',
+  'barbier retire. ses anciens rendez-vous sont conserves.': 'Barbier entfernt. Frühere Termine bleiben erhalten.', 'selectionnez un fichier image valide.': 'Wählen Sie eine gültige Bilddatei aus.',
+  'l’image ne doit pas depasser 5 mo.': 'Das Bild darf maximal 5 MB groß sein.', 'le televersement de l’image a echoue.': 'Das Bild konnte nicht hochgeladen werden.',
+  'la photo a ete televersee, mais le hero n’a pas ete mis a jour. executez hero-image-migration.sql.': 'Das Foto wurde hochgeladen, aber der Hero-Bereich konnte nicht aktualisiert werden. Führen Sie hero-image-migration.sql aus.',
+  'la photo du hero a ete mise a jour.': 'Das Hero-Foto wurde aktualisiert.', 'le seuil n’a pas ete enregistre. verifiez loyalty-program-settings-migration.sql et les droits admin supabase.': 'Der Schwellenwert wurde nicht gespeichert. Prüfen Sie loyalty-program-settings-migration.sql und die Supabase-Adminrechte.',
+  'erreur reseau : le seuil de fidelite n’a pas pu etre enregistre.': 'Netzwerkfehler: Der Treue-Schwellenwert konnte nicht gespeichert werden.',
+  'impossible d’enregistrer les reglages. verifiez que hero-image-migration.sql, loyalty-program-settings-migration.sql et loyalty-steps-migration.sql ont ete executes dans supabase.': 'Einstellungen konnten nicht gespeichert werden. Prüfen Sie, ob die Migrationen hero-image-migration.sql, loyalty-program-settings-migration.sql und loyalty-steps-migration.sql in Supabase ausgeführt wurden.',
+  'les reglages et le programme de fidelite ont ete enregistres.': 'Einstellungen und Treueprogramm wurden gespeichert.', 'la deconnexion a echoue. reessayez.': 'Abmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.',
+  'bienne': 'Biel', 'neuchatel': 'Neuenburg', 'berne': 'Bern', 'ivoire': 'Elfenbein', 'sable': 'Sand', 'sauge': 'Salbei', 'rose clair': 'Hellrosa',
+  'turquoise clair': 'Helltürkis', 'rouge suisse clair': 'Helles Schweizer Rot', 'bleu turquoise': 'Türkis', 'rouge suisse': 'Schweizer Rot',
+  'noir': 'Schwarz', 'ardoise': 'Schiefer', 'vert': 'Grün', 'or': 'Gold', 'bordeaux': 'Bordeauxrot', 'bleu': 'Blau', 'illustré': 'Illustriert',
+  'typographique': 'Typografisch', 'monogramme': 'Monogramm', 'nouvelle étape': 'Neuer Schritt',
+}
+
+function normalizeAdminCopy(value) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, '’').toLowerCase().trim()
+}
+
+function translateAdminValue(value, language) {
+  if (language !== 'DE' || typeof value !== 'string') return value
+  const leading = value.match(/^\s*/)?.[0] ?? ''
+  const trailing = value.match(/\s*$/)?.[0] ?? ''
+  const normalized = normalizeAdminCopy(value)
+  if (adminGermanCopy[normalized]) return `${leading}${adminGermanCopy[normalized]}${trailing}`
+  const pointUpdate = value.match(/^([+-]?\d+) point(?:s)? appliqu[eé]\.$/i)
+  if (pointUpdate) return `${pointUpdate[1]} Punkt${Math.abs(Number(pointUpdate[1])) === 1 ? '' : 'e'} hinzugefügt.`
+  const resetHistory = value.match(/^Historique de (.+)$/)
+  if (resetHistory) return `Verlauf von ${resetHistory[1]}`
+  const stepLabel = value.match(/^Supprimer l’(?:e|é)tape (\d+)$/i)
+  if (stepLabel) return `Schritt ${stepLabel[1]} löschen`
+  const resetLabel = value.match(/^Remettre à zéro le compteur de (.+)$/i)
+  if (resetLabel) return `Punktestand von ${resetLabel[1]} zurücksetzen`
+  const historyLabel = value.match(/^Historique client de (.+)$/i)
+  if (historyLabel) return `Kundenverlauf von ${historyLabel[1]}`
+  const deleteAppointmentLabel = value.match(/^Supprimer le rendez-vous de (.+)$/i)
+  if (deleteAppointmentLabel) return `Termin von ${deleteAppointmentLabel[1]} löschen`
+  const appointmentCount = value.match(/^(\d+)\s+rendez-vous$/i)
+  if (appointmentCount) return `${appointmentCount[1]} ${Number(appointmentCount[1]) === 1 ? 'Termin' : 'Termine'}`
+  const namedReset = value.match(/^Le compteur de (.+) est à zéro\. Son historique est conservé\.$/i)
+  if (namedReset) return `Der Punktestand von ${namedReset[1]} wurde zurückgesetzt. Der Verlauf bleibt erhalten.`
+  const deleteService = value.match(/^Supprimer la prestation «\s*(.+?)\s*» \? Cette action est définitive\.$/i)
+  if (deleteService) return `Dienstleistung « ${deleteService[1]} » löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.`
+  const namedService = value.match(/^Impossible de supprimer «\s*(.+?)\s*»\.$/i)
+  if (namedService) return `Dienstleistung « ${namedService[1]} » konnte nicht gelöscht werden.`
+  const savedTitle = value.match(/^Titre enregistré pour «\s*(.+?)\s*»\.$/i)
+  if (savedTitle) return `Titel für « ${savedTitle[1]} » gespeichert.`
+  const imageUpdated = value.match(/^Image mise à jour pour «\s*(.+?)\s*»\.$/i)
+  if (imageUpdated) return `Bild für « ${imageUpdated[1]} » aktualisiert.`
+  const imageRemoved = value.match(/^Image retirée pour «\s*(.+?)\s*»\.$/i)
+  if (imageRemoved) return `Bild für « ${imageRemoved[1]} » entfernt.`
+  return value
+}
+
+function AdminGermanContent({ children, language }) {
+  return Children.map(children, (child) => {
+    if (typeof child === 'string') return translateAdminValue(child, language)
+    if (!isValidElement(child)) return child
+    const props = { ...child.props }
+    for (const attribute of ['placeholder', 'title', 'aria-label', 'label']) {
+      if (typeof props[attribute] === 'string') props[attribute] = translateAdminValue(props[attribute], language)
+    }
+    if (props.children !== undefined) props.children = <AdminGermanContent language={language}>{props.children}</AdminGermanContent>
+    return cloneElement(child, props)
+  })
+}
+
+function formatDate(date, language = 'FR') {
   if (!date) return '—'
   const parsedDate = new Date(date.includes('T') ? date : `${date}T12:00:00`)
   if (Number.isNaN(parsedDate.getTime())) return '—'
-  return new Intl.DateTimeFormat('fr-CH', { dateStyle: 'medium' }).format(
+  return new Intl.DateTimeFormat(language === 'DE' ? 'de-CH' : 'fr-CH', { dateStyle: 'medium' }).format(
     parsedDate,
   )
 }
@@ -475,8 +608,8 @@ export default function AdminDashboard() {
   const deleteReservation = async (reservation) => {
     if (!supabase || deletingReservationId) return
     const confirmation = language === 'DE'
-      ? `Den Termin von ${reservation.client_name} am ${formatDate(reservation.appointment_date)} löschen?`
-      : `Supprimer le rendez-vous de ${reservation.client_name} du ${formatDate(reservation.appointment_date)} ?`
+      ? `Den Termin von ${reservation.client_name} am ${formatDate(reservation.appointment_date, language)} löschen?`
+      : `Supprimer le rendez-vous de ${reservation.client_name} du ${formatDate(reservation.appointment_date, language)} ?`
     if (!window.confirm(confirmation)) return
 
     setDeletingReservationId(reservation.id)
@@ -915,6 +1048,7 @@ export default function AdminDashboard() {
 
   return (
     <main className="admin-dashboard min-h-screen overflow-x-clip bg-zinc-950 text-zinc-100">
+      <AdminGermanContent language={language}>
       <header className="border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-8 sm:py-5 lg:px-10">
           <div className="flex min-w-0 items-center gap-3">
@@ -974,7 +1108,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {isLoading ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Chargement des réservations…</p> : reservationGroups.length === 0 ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Aucune réservation pour le moment.</p> : <div className="space-y-6">{reservationGroups.map((group) => <ReservationGroup key={group.id} group={group} pricesByService={pricesByService} onDeleteReservation={deleteReservation} deletingReservationId={deletingReservationId} />)}</div>}
+            {isLoading ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Chargement des réservations…</p> : reservationGroups.length === 0 ? <p className="border border-zinc-800 px-5 py-14 text-center text-zinc-500">Aucune réservation pour le moment.</p> : <div className="space-y-6">{reservationGroups.map((group) => <ReservationGroup key={group.id} group={group} pricesByService={pricesByService} onDeleteReservation={deleteReservation} deletingReservationId={deletingReservationId} language={language} />)}</div>}
           </section>
         ) : activeTab === 'loyalty' ? (
           <section>
@@ -1012,7 +1146,7 @@ export default function AdminDashboard() {
                               </td>
                               <td className="px-5 py-4 font-mono text-xs text-zinc-500">{card.member_code.slice(0, 8)}...</td>
                               <td className="px-5 py-4"><span className="font-display text-2xl text-amber-200">{card.points}</span></td>
-                              <td className="px-5 py-4 text-zinc-400">{formatDate(card.updated_at)}</td>
+                              <td className="px-5 py-4 text-zinc-400">{formatDate(card.updated_at, language)}</td>
                               <td className="px-5 py-4"><div className="flex items-center gap-2">
                                 <button type="button" onClick={() => void toggleLoyaltyHistory(card)} aria-label={`Historique client de ${card.profiles?.full_name || 'ce client'}`} title="Historique client" className="rounded-full border border-zinc-700 p-2 text-zinc-400 hover:border-amber-200 hover:text-amber-200"><History size={15} /></button>
                                 <button type="button" onClick={() => void adjustPoints(card.id, 1)} className="border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-amber-200 hover:text-amber-200">+1</button>
@@ -1024,7 +1158,7 @@ export default function AdminDashboard() {
                               <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-200"><History size={14} /> Historique de {card.profiles?.full_name || 'ce client'}</h3>
                               {isLoadingLoyaltyHistory ? <p className="text-sm text-zinc-500">Chargement de l’historique…</p>
                                 : loyaltyHistory.length === 0 ? <p className="text-sm text-zinc-500">Aucun point enregistré pour ce client.</p>
-                                  : <ul className="divide-y divide-zinc-800">{loyaltyHistory.map((event) => <li key={event.id} className="flex items-center justify-between gap-4 py-3 text-sm"><span className="text-zinc-400">{new Intl.DateTimeFormat('fr-CH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.created_at))}</span><strong className={event.point_delta > 0 ? 'text-emerald-400' : 'text-amber-200'}>{event.point_delta > 0 ? '+' : ''}{event.point_delta} point{Math.abs(event.point_delta) === 1 ? '' : 's'}</strong></li>)}</ul>}
+                                  : <ul className="divide-y divide-zinc-800">{loyaltyHistory.map((event) => <li key={event.id} className="flex items-center justify-between gap-4 py-3 text-sm"><span className="text-zinc-400">{new Intl.DateTimeFormat(language === 'DE' ? 'de-CH' : 'fr-CH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.created_at))}</span><strong className={event.point_delta > 0 ? 'text-emerald-400' : 'text-amber-200'}>{event.point_delta > 0 ? '+' : ''}{event.point_delta} point{Math.abs(event.point_delta) === 1 ? '' : 's'}</strong></li>)}</ul>}
                             </td></tr>}
                           </Fragment>
                         ))}
@@ -1039,7 +1173,7 @@ export default function AdminDashboard() {
               <h2 className="flex min-w-0 items-center gap-2 font-display text-2xl font-bold uppercase tracking-tight sm:text-3xl"><CalendarDays size={20} className="shrink-0 text-amber-200 sm:h-[22px] sm:w-[22px]" /> {labels.availabilityTitle}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">Ajoutez les créneaux que les clients peuvent réserver. Une fois réservé, un créneau disparaît automatiquement de leur calendrier.</p>
             </div>
-            <AvailabilityConfiguration availabilityDraft={availabilityDraft} setAvailabilityDraft={setAvailabilityDraft} barbers={barbersForSelectedSalon} allSlots={availabilitySlots.filter((slot) => slot.salon_id === availabilityDraft.salonId)} selectedBarberId={selectedBarberId} setSelectedBarberId={setSelectedBarberId} selectedSlotTimes={selectedSlotTimes} toggleSuggestedTime={toggleSuggestedTime} onSubmitSlots={handleAddAvailability} isSavingSlots={isSavingAvailability} existingSlots={selectedBarberSlots} onRemoveSlot={deactivateAvailability} onToggleSlot={toggleAvailabilityCell} onDeactivateBarber={deactivateBarber} barberDraft={barberDraft} setBarberDraft={setBarberDraft} barberFile={barberFile} setBarberFile={setBarberFile} onSubmitBarber={handleAddBarber} isSavingBarber={isSavingBarber} />
+            <AvailabilityConfiguration availabilityDraft={availabilityDraft} setAvailabilityDraft={setAvailabilityDraft} barbers={barbersForSelectedSalon} allSlots={availabilitySlots.filter((slot) => slot.salon_id === availabilityDraft.salonId)} selectedBarberId={selectedBarberId} setSelectedBarberId={setSelectedBarberId} selectedSlotTimes={selectedSlotTimes} toggleSuggestedTime={toggleSuggestedTime} onSubmitSlots={handleAddAvailability} isSavingSlots={isSavingAvailability} existingSlots={selectedBarberSlots} onRemoveSlot={deactivateAvailability} onToggleSlot={toggleAvailabilityCell} onDeactivateBarber={deactivateBarber} barberDraft={barberDraft} setBarberDraft={setBarberDraft} barberFile={barberFile} setBarberFile={setBarberFile} onSubmitBarber={handleAddBarber} isSavingBarber={isSavingBarber} language={language} />
             {activeTab === 'legacy' && <div className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
               <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
                 <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Nouveau créneau</p>
@@ -1195,6 +1329,7 @@ export default function AdminDashboard() {
           </button>
         </div>
       </div>
+      </AdminGermanContent>
     </main>
   )
 }
@@ -1213,14 +1348,14 @@ function DashboardField({ label, children }) {
   return <label className="block"><span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{label}</span>{children}</label>
 }
 
-function AvailabilityConfiguration({ availabilityDraft, setAvailabilityDraft, barbers, allSlots, selectedBarberId, setSelectedBarberId, selectedSlotTimes, toggleSuggestedTime, onSubmitSlots, isSavingSlots, existingSlots, onRemoveSlot, onToggleSlot, onDeactivateBarber, barberDraft, setBarberDraft, barberFile, setBarberFile, onSubmitBarber, isSavingBarber }) {
+function AvailabilityConfiguration({ availabilityDraft, setAvailabilityDraft, barbers, allSlots, selectedBarberId, setSelectedBarberId, selectedSlotTimes, toggleSuggestedTime, onSubmitSlots, isSavingSlots, existingSlots, onRemoveSlot, onToggleSlot, onDeactivateBarber, barberDraft, setBarberDraft, barberFile, setBarberFile, onSubmitBarber, isSavingBarber, language }) {
   const today = new Date().toISOString().slice(0, 10)
   const updateAvailabilitySalon = (salonId) => {
     setAvailabilityDraft((draft) => ({ ...draft, salonId }))
     setSelectedBarberId('')
   }
 
-  return <><AvailabilityGrid availabilityDraft={availabilityDraft} setAvailabilityDraft={setAvailabilityDraft} barbers={barbers} allSlots={allSlots} onToggleSlot={onToggleSlot} onDeactivateBarber={onDeactivateBarber} barberDraft={barberDraft} setBarberDraft={setBarberDraft} barberFile={barberFile} setBarberFile={setBarberFile} onSubmitBarber={onSubmitBarber} isSavingBarber={isSavingBarber} today={today} /><div className="hidden">
+  return <AdminGermanContent language={language}><><AvailabilityGrid availabilityDraft={availabilityDraft} setAvailabilityDraft={setAvailabilityDraft} barbers={barbers} allSlots={allSlots} onToggleSlot={onToggleSlot} onDeactivateBarber={onDeactivateBarber} barberDraft={barberDraft} setBarberDraft={setBarberDraft} barberFile={barberFile} setBarberFile={setBarberFile} onSubmitBarber={onSubmitBarber} isSavingBarber={isSavingBarber} today={today} language={language} /><div className="hidden">
     <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
       <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">L’équipe</p>
       <h3 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Ajouter un barbier</h3>
@@ -1250,11 +1385,11 @@ function AvailabilityConfiguration({ availabilityDraft, setAvailabilityDraft, ba
         </section>
       </div>
     </article>
-  </div></>
+  </div></></AdminGermanContent>
 }
 
-function AvailabilityGrid({ availabilityDraft, setAvailabilityDraft, barbers, allSlots, onToggleSlot, onDeactivateBarber, barberDraft, setBarberDraft, barberFile, setBarberFile, onSubmitBarber, isSavingBarber, today }) {
-  return <><BarberAvailabilityCards availabilityDraft={availabilityDraft} setAvailabilityDraft={setAvailabilityDraft} barbers={barbers} allSlots={allSlots} onToggleSlot={onToggleSlot} onDeactivateBarber={onDeactivateBarber} barberDraft={barberDraft} setBarberDraft={setBarberDraft} barberFile={barberFile} setBarberFile={setBarberFile} onSubmitBarber={onSubmitBarber} isSavingBarber={isSavingBarber} today={today} /><div className="hidden space-y-6">
+function AvailabilityGrid({ availabilityDraft, setAvailabilityDraft, barbers, allSlots, onToggleSlot, onDeactivateBarber, barberDraft, setBarberDraft, barberFile, setBarberFile, onSubmitBarber, isSavingBarber, today, language }) {
+  return <AdminGermanContent language={language}><><BarberAvailabilityCards availabilityDraft={availabilityDraft} setAvailabilityDraft={setAvailabilityDraft} barbers={barbers} allSlots={allSlots} onToggleSlot={onToggleSlot} onDeactivateBarber={onDeactivateBarber} barberDraft={barberDraft} setBarberDraft={setBarberDraft} barberFile={barberFile} setBarberFile={setBarberFile} onSubmitBarber={onSubmitBarber} isSavingBarber={isSavingBarber} today={today} language={language} /><div className="hidden space-y-6">
     <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
       <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">L'équipe</p>
       <h3 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Ajouter un barbier</h3>
@@ -1271,19 +1406,19 @@ function AvailabilityGrid({ availabilityDraft, setAvailabilityDraft, barbers, al
       <section className="mt-7 overflow-x-auto border border-zinc-800"><table className="min-w-[1250px] w-full text-center text-sm"><thead className="border-b border-zinc-800 bg-zinc-900 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500"><tr><th className="sticky left-0 z-10 min-w-40 bg-zinc-900 px-4 py-4 text-left">Barbier</th>{suggestedTimes.map((time) => <th key={time} className="min-w-20 px-2 py-4 font-mono">{time}</th>)}</tr></thead><tbody className="divide-y divide-zinc-800">{barbers.map((barber) => <tr key={barber.id}><th className="sticky left-0 z-10 bg-zinc-950 px-4 py-3 text-left font-semibold text-zinc-200"><div className="flex items-center gap-3"><img src={barber.image_url} alt="" className="h-9 w-9 object-cover" /><span>{barber.name}</span><button type="button" onClick={() => onDeactivateBarber(barber.id)} className="ml-auto text-[10px] font-bold uppercase text-red-300 hover:text-red-100">Retirer</button></div></th>{suggestedTimes.map((time) => { const slot = allSlots.find((item) => item.barber_id === barber.id && item.appointment_time.slice(0, 5) === time); const state = slot?.reserved_at ? 'reserved' : slot?.is_active ? 'open' : 'closed'; return <td key={time} className="px-2 py-3"><button type="button" disabled={state === 'reserved'} onClick={() => onToggleSlot(barber.id, time, slot)} aria-label={`${barber.name}, ${time}`} className={`h-10 w-full border text-[10px] font-bold uppercase transition ${state === 'reserved' ? 'cursor-not-allowed border-amber-200/40 bg-amber-200/10 text-amber-200' : state === 'open' ? 'border-emerald-400/60 bg-emerald-400/15 text-emerald-300 hover:border-emerald-300' : 'border-zinc-800 bg-zinc-950 text-zinc-600 hover:border-emerald-400/60 hover:text-emerald-300'}`}>{state === 'reserved' ? 'Réservé' : state === 'open' ? 'Disponible' : '—'}</button></td>})}</tr>)}</tbody></table></section>
       <p className="mt-4 text-xs text-zinc-500">Cliquez sur une case vide : elle devient verte et disponible. Cliquez sur une case verte : elle est fermée. Une case jaune est déjà réservée. Chaque barbier possède ses propres créneaux, donc trois barbiers peuvent recevoir trois clients à la même heure.</p>
     </article>
-  </div></>
+  </div></></AdminGermanContent>
 }
 
-function BarberAvailabilityCards({ availabilityDraft, setAvailabilityDraft, barbers, allSlots, onToggleSlot, onDeactivateBarber, barberDraft, setBarberDraft, barberFile, setBarberFile, onSubmitBarber, isSavingBarber, today }) {
+function BarberAvailabilityCards({ availabilityDraft, setAvailabilityDraft, barbers, allSlots, onToggleSlot, onDeactivateBarber, barberDraft, setBarberDraft, barberFile, setBarberFile, onSubmitBarber, isSavingBarber, today, language }) {
   const [datesByBarber, setDatesByBarber] = useState({})
   const defaultDate = availabilityDraft.appointmentDate || today
 
-  return <div className="space-y-6">
+  return <AdminGermanContent language={language}><div className="space-y-6">
     <article className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
       <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">L'équipe</p>
       <h3 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Ajouter un barbier</h3>
       <form className="mt-6 grid gap-4 md:grid-cols-3" onSubmit={onSubmitBarber}>
-        
+
         <DashboardField label="Nom"><input required value={barberDraft.name} onChange={(event) => setBarberDraft((draft) => ({ ...draft, name: event.target.value }))} className="dashboard-input" placeholder="Ex. Moha" /></DashboardField>
         <DashboardField label="Photo"><input id="barber-image-upload" required type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setBarberFile(event.target.files?.[0] ?? null)} className="block w-full border border-dashed border-zinc-700 bg-zinc-950 px-3 py-3 text-xs text-zinc-400" /></DashboardField>
         <button type="submit" className="button-primary self-end" disabled={!barberFile || isSavingBarber}><Upload size={16} />{isSavingBarber ? 'Ajout…' : 'Ajouter'}</button>
@@ -1292,32 +1427,33 @@ function BarberAvailabilityCards({ availabilityDraft, setAvailabilityDraft, barb
 
     <section className="border border-zinc-800 bg-zinc-900/35 p-6 sm:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Disponibilités</p><h3 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">Créneaux par barbier</h3></div></div>
-      {barbers.length === 0 ? <p className="mt-6 border border-dashed border-zinc-700 px-4 py-5 text-sm text-zinc-500">Ajoutez un barbier pour commencer.</p> : <div className="mt-7 grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 34rem), 1fr))' }}>{barbers.map((barber) => <BarberAvailabilityCard key={barber.id} barber={barber} slots={allSlots.filter((slot) => slot.barber_id === barber.id)} selectedDate={datesByBarber[barber.id] || defaultDate} onDateChange={(date) => { setDatesByBarber((dates) => ({ ...dates, [barber.id]: date })); setAvailabilityDraft((draft) => ({ ...draft, appointmentDate: date })) }} onToggleSlot={onToggleSlot} onDeactivate={() => onDeactivateBarber(barber.id)} today={today} />)}</div>}
+      {barbers.length === 0 ? <p className="mt-6 border border-dashed border-zinc-700 px-4 py-5 text-sm text-zinc-500">Ajoutez un barbier pour commencer.</p> : <div className="mt-7 grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 34rem), 1fr))' }}>{barbers.map((barber) => <BarberAvailabilityCard key={barber.id} barber={barber} slots={allSlots.filter((slot) => slot.barber_id === barber.id)} selectedDate={datesByBarber[barber.id] || defaultDate} onDateChange={(date) => { setDatesByBarber((dates) => ({ ...dates, [barber.id]: date })); setAvailabilityDraft((draft) => ({ ...draft, appointmentDate: date })) }} onToggleSlot={onToggleSlot} onDeactivate={() => onDeactivateBarber(barber.id)} today={today} language={language} />)}</div>}
     </section>
-  </div>
+  </div></AdminGermanContent>
 }
 
-function BarberAvailabilityCard({ barber, slots, selectedDate, onDateChange, onToggleSlot, onDeactivate, today }) {
+function BarberAvailabilityCard({ barber, slots, selectedDate, onDateChange, onToggleSlot, onDeactivate, today, language }) {
   const [monthCursor, setMonthCursor] = useState(() => new Date(`${selectedDate}T12:00:00`))
   const monthStart = new Date(monthCursor.getFullYear(), monthCursor.getMonth(), 1)
   const daysInMonth = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 0).getDate()
   const firstWeekday = (monthStart.getDay() + 6) % 7
-  const label = new Intl.DateTimeFormat('fr-CH', { month: 'long', year: 'numeric' }).format(monthStart)
+  const label = new Intl.DateTimeFormat(language === 'DE' ? 'de-CH' : 'fr-CH', { month: 'long', year: 'numeric' }).format(monthStart)
+  const weekdayLabels = language === 'DE' ? ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] : ['L', 'M', 'M', 'J', 'V', 'S', 'D']
   const calendarDays = Array.from({ length: firstWeekday + daysInMonth }, (_, index) => index < firstWeekday ? null : index - firstWeekday + 1)
   const toDate = (day) => `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
   const dayHasSlot = (date) => slots.some((slot) => slot.appointment_date === date && slot.is_active)
   const timeSlots = slots.filter((slot) => slot.appointment_date === selectedDate)
 
-  return <article className="border border-zinc-800 bg-zinc-950/50 p-4 sm:p-5"><header className="flex items-center gap-3 border-b border-zinc-800 pb-4"><img src={barber.image_url} alt={barber.name} className="h-14 w-14 border border-zinc-700 object-cover" /><h4 className="font-display text-xl font-bold uppercase tracking-tight text-zinc-100">{barber.name}</h4><button type="button" onClick={onDeactivate} className="ml-auto text-[10px] font-bold uppercase tracking-wide text-red-300 hover:text-red-100">Retirer</button></header><div className="mt-5 grid gap-5 md:grid-cols-2"><section><div className="mb-3 flex items-center justify-between"><button type="button" onClick={() => setMonthCursor((date) => new Date(date.getFullYear(), date.getMonth() - 1, 1))} className="px-2 text-zinc-400 hover:text-amber-200" aria-label="Mois précédent">‹</button><p className="text-sm font-bold capitalize text-zinc-200">{label}</p><button type="button" onClick={() => setMonthCursor((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1))} className="px-2 text-zinc-400 hover:text-amber-200" aria-label="Mois suivant">›</button></div><div className="grid grid-cols-7 gap-1 text-center text-[10px] text-zinc-600">{['L','M','M','J','V','S','D'].map((day, index) => <span key={`${day}-${index}`} className="py-1">{day}</span>)}{calendarDays.map((day, index) => { if (!day) return <span key={`blank-${index}`} />; const date = toDate(day); const isPast = date < today; return <button key={date} type="button" disabled={isPast} onClick={() => onDateChange(date)} className={`relative h-8 rounded-sm text-xs transition ${selectedDate === date ? 'bg-amber-200 font-bold text-zinc-950' : isPast ? 'cursor-not-allowed text-zinc-800' : 'text-zinc-300 hover:bg-zinc-800'} ${dayHasSlot(date) && selectedDate !== date ? 'ring-1 ring-emerald-400/60' : ''}`}>{day}</button>})}</div></section><section><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">Horaires · {selectedDate}</p><div className="grid grid-cols-3 gap-2">{suggestedTimes.map((time) => { const slot = timeSlots.find((item) => item.appointment_time.slice(0, 5) === time); const state = slot?.reserved_at ? 'reserved' : slot?.is_active ? 'open' : 'closed'; return <button type="button" key={time} disabled={state === 'reserved'} onClick={() => onToggleSlot(barber.id, selectedDate, time, slot)} className={`border px-2 py-3 font-mono text-sm transition ${state === 'reserved' ? 'cursor-not-allowed border-amber-200/40 bg-amber-200/10 text-amber-200' : state === 'open' ? 'border-emerald-400/60 bg-emerald-400/15 text-emerald-300' : 'border-zinc-800 text-zinc-500 hover:border-emerald-400/60 hover:text-emerald-300'}`}>{time}</button>})}</div></section></div></article>
+  return <AdminGermanContent language={language}><article className="border border-zinc-800 bg-zinc-950/50 p-4 sm:p-5"><header className="flex items-center gap-3 border-b border-zinc-800 pb-4"><img src={barber.image_url} alt={barber.name} className="h-14 w-14 border border-zinc-700 object-cover" /><h4 className="font-display text-xl font-bold uppercase tracking-tight text-zinc-100">{barber.name}</h4><button type="button" onClick={onDeactivate} className="ml-auto text-[10px] font-bold uppercase tracking-wide text-red-300 hover:text-red-100">Retirer</button></header><div className="mt-5 grid gap-5 md:grid-cols-2"><section><div className="mb-3 flex items-center justify-between"><button type="button" onClick={() => setMonthCursor((date) => new Date(date.getFullYear(), date.getMonth() - 1, 1))} className="px-2 text-zinc-400 hover:text-amber-200" aria-label="Mois précédent">‹</button><p className="text-sm font-bold capitalize text-zinc-200">{label}</p><button type="button" onClick={() => setMonthCursor((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1))} className="px-2 text-zinc-400 hover:text-amber-200" aria-label="Mois suivant">›</button></div><div className="grid grid-cols-7 gap-1 text-center text-[10px] text-zinc-600">{weekdayLabels.map((day, index) => <span key={`${day}-${index}`} className="py-1">{day}</span>)}{calendarDays.map((day, index) => { if (!day) return <span key={`blank-${index}`} />; const date = toDate(day); const isPast = date < today; return <button key={date} type="button" disabled={isPast} onClick={() => onDateChange(date)} className={`relative h-8 rounded-sm text-xs transition ${selectedDate === date ? 'bg-amber-200 font-bold text-zinc-950' : isPast ? 'cursor-not-allowed text-zinc-800' : 'text-zinc-300 hover:bg-zinc-800'} ${dayHasSlot(date) && selectedDate !== date ? 'ring-1 ring-emerald-400/60' : ''}`}>{day}</button>})}</div></section><section><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{language === 'DE' ? `Zeiten · ${selectedDate}` : `Horaires · ${selectedDate}`}</p><div className="grid grid-cols-3 gap-2">{suggestedTimes.map((time) => { const slot = timeSlots.find((item) => item.appointment_time.slice(0, 5) === time); const state = slot?.reserved_at ? 'reserved' : slot?.is_active ? 'open' : 'closed'; return <button type="button" key={time} disabled={state === 'reserved'} onClick={() => onToggleSlot(barber.id, selectedDate, time, slot)} className={`border px-2 py-3 font-mono text-sm transition ${state === 'reserved' ? 'cursor-not-allowed border-amber-200/40 bg-amber-200/10 text-amber-200' : state === 'open' ? 'border-emerald-400/60 bg-emerald-400/15 text-emerald-300' : 'border-zinc-800 text-zinc-500 hover:border-emerald-400/60 hover:text-emerald-300'}`}>{time}</button>})}</div></section></div></article></AdminGermanContent>
 }
 
-function ReservationGroup({ group, pricesByService, onDeleteReservation, deletingReservationId }) {
+function ReservationGroup({ group, pricesByService, onDeleteReservation, deletingReservationId, language }) {
   return (
-    <section className="overflow-hidden border border-zinc-800 bg-zinc-900/35">
+    <AdminGermanContent language={language}>    <section className="overflow-hidden border border-zinc-800 bg-zinc-900/35">
       <header className="flex items-center gap-3 border-b border-zinc-800 bg-zinc-900 px-5 py-4">
         {group.imageUrl ? <img src={group.imageUrl} alt="" className="h-10 w-10 rounded-full border border-zinc-700 object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 text-zinc-500"><Scissors size={16} /></span>}
         <h3 className="font-display text-xl font-bold uppercase text-zinc-100">{group.name}</h3>
-        <span className="ml-auto text-xs text-zinc-500">{group.reservations.length} rendez-vous</span>
+        <span className="ml-auto text-xs text-zinc-500">{language === 'DE' ? `${group.reservations.length} ${group.reservations.length === 1 ? 'Termin' : 'Termine'}` : `${group.reservations.length} rendez-vous`}</span>
       </header>
       <div className="overflow-x-auto">
         <table className="min-w-[840px] w-full text-left text-sm">
@@ -1331,7 +1467,7 @@ function ReservationGroup({ group, pricesByService, onDeleteReservation, deletin
                 <td className="px-5 py-4 text-zinc-400">{reservation.client_phone}</td>
                 <td className="px-5 py-4 text-zinc-300">{reservation.service_name}</td>
                 <td className="px-5 py-4"><span className="price-badge">{pricesByService.get(reservation.service_name) ?? '—'}</span></td>
-                <td className="px-5 py-4 text-zinc-300">{formatDate(reservation.appointment_date)}</td>
+                <td className="px-5 py-4 text-zinc-300">{formatDate(reservation.appointment_date, language)}</td>
                 <td className="px-5 py-4 font-mono text-zinc-300">{reservation.appointment_time?.slice(0, 5) ?? '—'}</td>
                 <td className="px-5 py-4"><span className={reservation.status === 'confirmed' ? 'text-emerald-400' : reservation.status === 'cancelled' ? 'text-zinc-500' : 'text-amber-200'}>{reservation.status === 'confirmed' ? 'Confirmé' : reservation.status === 'cancelled' ? 'Annulé' : 'En attente'}</span></td>
                 <td className="px-5 py-4"><button type="button" onClick={() => void onDeleteReservation(reservation)} disabled={Boolean(deletingReservationId)} aria-label={`Supprimer le rendez-vous de ${reservation.client_name}`} title="Supprimer le rendez-vous" className="rounded-full border border-red-400/40 p-2 text-red-300 hover:border-red-300 hover:bg-red-400/10 disabled:cursor-wait disabled:opacity-50"><Trash2 size={15} /></button></td>
@@ -1340,6 +1476,6 @@ function ReservationGroup({ group, pricesByService, onDeleteReservation, deletin
           </tbody>
         </table>
       </div>
-    </section>
+    </section></AdminGermanContent>
   )
 }
