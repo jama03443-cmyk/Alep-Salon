@@ -1195,7 +1195,84 @@ function AdminPortal() {
 
   if (isLoading) return <RouteLoading />
   if (session && isAdmin) return <Navigate to="/admin-dashboard" replace />
-  return <Suspense fallback={<RouteLoading />}><LoginScreen /></Suspense>
+  return <>
+    <Suspense fallback={<RouteLoading />}><LoginScreen /></Suspense>
+    <AdminPwaInstallPopup />
+  </>
+}
+
+function AdminPwaInstallPopup() {
+  const [visible, setVisible] = useState(false)
+  const [installPrompt, setInstallPrompt] = useState(() => window.alepInstallPrompt || null)
+  const [helpMessage, setHelpMessage] = useState('')
+
+  useEffect(() => {
+    const isInstalled = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true
+    if (isInstalled) return undefined
+
+    const handleInstallPrompt = () => setInstallPrompt(window.alepInstallPrompt || null)
+    const handleAppInstalled = () => {
+      window.alepInstallPrompt = null
+      setInstallPrompt(null)
+      setVisible(false)
+    }
+
+    window.addEventListener('alepinstallprompt', handleInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+    const timer = window.setTimeout(() => setVisible(true), 5000)
+
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('alepinstallprompt', handleInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+    }
+  }, [])
+
+  const handleInstall = async () => {
+    if (!installPrompt) {
+      const isAppleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      const isAndroid = /Android/i.test(navigator.userAgent)
+      setHelpMessage(isAppleMobile
+        ? 'Sur iPhone ou iPad : ouvrez cette page dans Safari, touchez Partager, puis « Sur l’écran d’accueil ».'
+        : isAndroid
+          ? 'Sur Android : ouvrez cette page dans Chrome, touchez ⋮, puis « Installer l’application » ou « Ajouter à l’écran d’accueil ».'
+          : 'Dans Chrome ou Edge, ouvrez le menu ⋮ puis choisissez « Installer Alep Admin ».')
+      return
+    }
+
+    try {
+      setHelpMessage('')
+      await installPrompt.prompt()
+      const choice = await installPrompt.userChoice
+      if (choice?.outcome === 'accepted') setVisible(false)
+    } finally {
+      window.alepInstallPrompt = null
+      setInstallPrompt(null)
+    }
+  }
+
+  if (!visible) return null
+
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-3 z-[120] flex justify-center px-3 sm:top-5 sm:px-5">
+      <section className="pointer-events-auto relative w-full max-w-lg rounded-xl border border-amber-300/50 bg-zinc-950/95 p-4 pr-12 text-white shadow-[0_12px_48px_rgba(0,0,0,0.42)] backdrop-blur-md" role="dialog" aria-modal="false" aria-labelledby="admin-install-title">
+        <button type="button" onClick={() => setVisible(false)} aria-label="Fermer" className="absolute right-2 top-2 rounded-full p-2 text-zinc-400 transition hover:bg-white/10 hover:text-white"><X size={16} /></button>
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-300/10 text-amber-200"><Download size={17} /></div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-amber-200">Alep Salon · Admin</p>
+            <h2 id="admin-install-title" className="mt-0.5 font-display text-base font-bold uppercase tracking-tight">Installer Alep Admin</h2>
+            <p className="mt-1 text-xs leading-5 text-zinc-300">Accédez à la connexion admin depuis l’écran d’accueil de ce téléphone.</p>
+          </div>
+        </div>
+        <div className="mt-3 pl-12">
+          <button type="button" className="button-primary min-h-9 w-full justify-center px-3 py-2 text-xs" onClick={() => void handleInstall()}><Download size={17} />Installer la PWA Admin</button>
+          {helpMessage && <p role="status" className="mt-3 text-xs leading-5 text-zinc-300">{helpMessage}</p>}
+        </div>
+      </section>
+    </div>
+  )
 }
 
 function RequireAdmin({ children }) {
