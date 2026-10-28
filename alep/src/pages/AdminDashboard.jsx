@@ -1117,6 +1117,9 @@ export default function AdminDashboard() {
             <DashboardTab active={activeTab === 'cms'} onClick={() => setActiveTab('cms')} icon={<ImageUp size={15} />}>
               {labels.management}
             </DashboardTab>
+            <DashboardTab active={activeTab === 'client-qr'} onClick={() => setActiveTab('client-qr')} icon={<QrCode size={15} />}>
+              {language === 'DE' ? 'Kunden-App' : 'QR client'}
+            </DashboardTab>
           </div>
         </div>
 
@@ -1221,6 +1224,30 @@ export default function AdminDashboard() {
                 <div className="overflow-x-auto"><table className="min-w-[620px] w-full text-left text-sm"><thead className="border-b border-zinc-800 bg-zinc-900 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500"><tr><th className="px-5 py-4">Salon</th><th className="px-5 py-4">Date</th><th className="px-5 py-4">Heure</th><th className="px-5 py-4">Statut</th><th className="px-5 py-4">Action</th></tr></thead><tbody className="divide-y divide-zinc-800">{isLoading ? <tr><td colSpan="5" className="px-5 py-12 text-center text-zinc-500">Chargement…</td></tr> : availabilitySlots.length === 0 ? <tr><td colSpan="5" className="px-5 py-12 text-center text-zinc-500">Aucun créneau configuré.</td></tr> : availabilitySlots.map((slot) => <tr key={slot.id}><td className="px-5 py-4 text-zinc-200">{salonNames[slot.salon_id] ?? slot.salon_id}</td><td className="px-5 py-4 text-zinc-400">{formatDate(slot.appointment_date)}</td><td className="px-5 py-4 font-mono text-zinc-300">{slot.appointment_time.slice(0, 5)}</td><td className="px-5 py-4"><span className={slot.reserved_at ? 'text-amber-200' : slot.is_active ? 'text-emerald-400' : 'text-zinc-600'}>{slot.reserved_at ? 'Réservé' : slot.is_active ? 'Disponible' : 'Fermé'}</span></td><td className="px-5 py-4">{slot.is_active && !slot.reserved_at ? <button type="button" onClick={() => void deactivateAvailability(slot.id)} className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-amber-200">Retirer</button> : '—'}</td></tr>)}</tbody></table></div>
               </article>
             </div>}
+          </section>
+        ) : activeTab === 'client-qr' ? (
+          <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,380px)_1fr]">
+            <article className="border border-zinc-800 bg-zinc-900/35 p-5 sm:p-7">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Alep Salon</p>
+              <h2 className="mt-3 font-display text-3xl font-bold uppercase tracking-tight">{language === 'DE' ? 'Kunden-App installieren' : 'Installer l’application client'}</h2>
+              <img src="/qr-client.svg" alt={language === 'DE' ? 'QR-Code zur Alep Salon Kunden-App' : 'QR code de l’application client Alep Salon'} className="mx-auto mt-6 aspect-square w-full max-w-[340px] border border-zinc-700 bg-white p-2" />
+              <a href="/qr-client.svg" download="alep-salon-qr-client.svg" className="button-ghost mt-5 w-full justify-center">
+                {language === 'DE' ? 'QR-Code herunterladen' : 'Télécharger le QR code'}
+              </a>
+            </article>
+
+            <article className="border border-zinc-800 bg-zinc-900/35 p-5 sm:p-7">
+              <h3 className="font-display text-xl font-bold uppercase tracking-wide text-zinc-100">{language === 'DE' ? 'So geht’s' : 'Comment faire'}</h3>
+              <ol className="mt-5 space-y-4 text-sm leading-6 text-zinc-300">
+                <li><span className="mr-2 font-bold text-amber-200">1.</span>{language === 'DE' ? 'Zeige diesen QR-Code dem Kunden.' : 'Montrez ce QR code au client.'}</li>
+                <li><span className="mr-2 font-bold text-amber-200">2.</span>{language === 'DE' ? 'Der Kunde scannt ihn mit der Telefonkamera und öffnet den Link.' : 'Le client le scanne avec l’appareil photo de son téléphone et ouvre le lien.'}</li>
+                <li><span className="mr-2 font-bold text-amber-200">3.</span>{language === 'DE' ? 'In Chrome öffnet er das Menü und wählt „App installieren“ oder „Zum Startbildschirm hinzufügen“.' : 'Dans Chrome, il ouvre le menu puis choisit « Installer l’application » ou « Ajouter à l’écran d’accueil ».'}</li>
+              </ol>
+              <a href="https://alep-salon-seven.vercel.app/" target="_blank" rel="noreferrer" className="button-primary mt-7 inline-flex min-h-11 justify-center px-5">
+                {language === 'DE' ? 'Kundenseite öffnen' : 'Ouvrir le site client'}
+              </a>
+              <p className="mt-4 break-all font-mono text-xs text-zinc-500">https://alep-salon-seven.vercel.app/</p>
+            </article>
           </section>
         ) : (
           <section className="grid gap-6 xl:grid-cols-2">
