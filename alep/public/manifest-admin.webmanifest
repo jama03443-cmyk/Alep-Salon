@@ -1,10 +1,10 @@
 {
   "id": "/admin-app",
-  "name": "Admin",
-  "short_name": "Admin",
+  "name": "Alep Salon Admin",
+  "short_name": "Alep Admin",
   "description": "Gestion privée d’Alep Salon.",
   "start_url": "/admin-portal",
-  "scope": "/",
+  "scope": "/admin-",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#09090b",
